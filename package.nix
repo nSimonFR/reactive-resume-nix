@@ -30,6 +30,12 @@
   pnpmConfigHook,
   fetchPnpmDeps,
   python3,
+  # Build the SPA under a URL sub-path (Vite `base`, router basepath, and the
+  # client/server absolute-URL builders all derive from this — see
+  # patches/base-path-support.patch). "/" = served at the web root (default);
+  # e.g. "/rxresume/" = served behind a reverse-proxy at that prefix. MUST keep
+  # the trailing slash for a sub-path (Vite's `base` convention).
+  appBasePath ? "/",
 }:
 
 let
@@ -89,6 +95,15 @@ stdenv.mkDerivation (finalAttrs: {
     hash = "sha256-K5WUMzL8Ntb/SpcFDVlSsPXdXqSzoKpnshG92egqim8=";
   };
 
+  # Base-path (URL sub-path) support. Rewrites the ~13 client/server sites that
+  # hardcode a root origin (Vite `base`, TanStack Router basepath, the oRPC +
+  # better-auth client base, public-share/avatar URLs, and the server's
+  # APP_URL-joined PDF/storage/login URLs) to derive from the base path. The
+  # patch does not touch package.json / pnpm-lock.yaml, so pnpmDeps is unchanged.
+  # It is a no-op at APP_BASE_PATH=/ (the default), so the default build is the
+  # stock root-served app.
+  patches = [ ./patches/base-path-support.patch ];
+
   nativeBuildInputs = [
     nodejs_24
     pnpm_11
@@ -101,6 +116,9 @@ stdenv.mkDerivation (finalAttrs: {
     CI = "1";
     # node-gyp builds bcrypt against these headers, fully offline.
     npm_config_nodedir = "${nodejs_24}";
+    # Vite reads this in apps/web/vite.config.ts (`base`) at build time; the
+    # patched client sources derive their router basepath + fetch bases from it.
+    APP_BASE_PATH = appBasePath;
   };
 
   buildPhase = ''
@@ -112,7 +130,10 @@ stdenv.mkDerivation (finalAttrs: {
 
     # Build only the web SPA + server bundle; turbo pulls in the workspace
     # packages they depend on transitively (keeps peak RAM down vs. all 16).
-    pnpm exec turbo run build --filter=web --filter=server
+    # --env-mode=loose: turbo 2.x strips undeclared env vars from tasks by
+    # default (strict mode), which would hide APP_BASE_PATH from `vite build`
+    # (→ base always "/"). Loose passes the full build env through to the tasks.
+    pnpm exec turbo run build --filter=web --filter=server --env-mode=loose
 
     runHook postBuild
   '';

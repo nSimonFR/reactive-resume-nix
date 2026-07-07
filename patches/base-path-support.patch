@@ -1,0 +1,160 @@
+diff -ruN a/apps/server/src/http/auth.ts b/apps/server/src/http/auth.ts
+--- a/apps/server/src/http/auth.ts	2026-07-07 21:18:25.629913519 +0200
++++ b/apps/server/src/http/auth.ts	2026-07-07 21:19:09.962410441 +0200
+@@ -198,7 +198,7 @@
+ 		});
+ 	}
+ 
+-	const loginUrl = new URL("/auth/login", env.APP_URL);
++	const loginUrl = new URL(env.APP_URL + "/auth/login");
+ 	const oauthParams = new URLSearchParams();
+ 	for (const [key, value] of url.searchParams) {
+ 		if (!oauthCallbackPassthroughExcludedParams.has(key)) {
+diff -ruN a/apps/server/src/static/uploads.ts b/apps/server/src/static/uploads.ts
+--- a/apps/server/src/static/uploads.ts	2026-07-07 21:18:25.641913654 +0200
++++ b/apps/server/src/static/uploads.ts	2026-07-07 21:19:09.962410441 +0200
+@@ -41,7 +41,7 @@
+ 	headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+ 	headers.set("X-Frame-Options", "DENY");
+ 	headers.set("X-Download-Options", "noopen");
+-	headers.set("Access-Control-Allow-Origin", env.APP_URL);
++	headers.set("Access-Control-Allow-Origin", new URL(env.APP_URL).origin);
+ 
+ 	return new Response(toArrayBuffer(storedFile.data), { headers });
+ }
+diff -ruN a/apps/web/src/dialogs/resume/index.tsx b/apps/web/src/dialogs/resume/index.tsx
+--- a/apps/web/src/dialogs/resume/index.tsx	2026-07-07 21:18:25.549912621 +0200
++++ b/apps/web/src/dialogs/resume/index.tsx	2026-07-07 21:19:09.958410397 +0200
+@@ -344,7 +344,7 @@
+ 	render: function ResumeFormRenderer({ form }) {
+ 		const { data: session } = authClient.useSession();
+ 
+-		const slugPrefix = `${window.location.origin}/${session?.user.username ?? ""}/`;
++		const slugPrefix = `${window.location.origin}${import.meta.env.BASE_URL}${session?.user.username ?? ""}/`;
+ 
+ 		const onGenerateName = () => {
+ 			form.setFieldValue("name", generateRandomName());
+diff -ruN a/apps/web/src/libs/auth/client.ts b/apps/web/src/libs/auth/client.ts
+--- a/apps/web/src/libs/auth/client.ts	2026-07-07 21:18:25.505912127 +0200
++++ b/apps/web/src/libs/auth/client.ts	2026-07-07 21:19:09.954410352 +0200
+@@ -15,6 +15,7 @@
+ 
+ const getAuthClient = () => {
+ 	return createAuthClient({
++		baseURL: typeof window === "undefined" ? undefined : (window.location.origin + import.meta.env.BASE_URL).replace(/\/+$/, ""),
+ 		plugins: [
+ 			dashClient(),
+ 			adminClient(),
+diff -ruN a/apps/web/src/libs/orpc/client.ts b/apps/web/src/libs/orpc/client.ts
+--- a/apps/web/src/libs/orpc/client.ts	2026-07-07 21:18:25.489911947 +0200
++++ b/apps/web/src/libs/orpc/client.ts	2026-07-07 21:19:09.954410352 +0200
+@@ -7,7 +7,7 @@
+ 
+ const getRpcUrl = () => {
+ 	if (typeof window === "undefined") return "http://localhost:3000/api/rpc";
+-	return `${window.location.origin}/api/rpc`;
++	return `${window.location.origin}${import.meta.env.BASE_URL}api/rpc`;
+ };
+ 
+ const createRpcClient = (): RouterClient<typeof router> => {
+diff -ruN a/apps/web/src/router.tsx b/apps/web/src/router.tsx
+--- a/apps/web/src/router.tsx	2026-07-07 21:18:25.473911767 +0200
++++ b/apps/web/src/router.tsx	2026-07-07 21:19:09.954410352 +0200
+@@ -22,6 +22,7 @@
+ 	await loadLocale(locale);
+ 
+ 	const router = createRouter({
++		basepath: (import.meta.env.BASE_URL || "/").replace(/\/+$/, "") || "/",
+ 		routeTree,
+ 		scrollRestoration: true,
+ 		defaultViewTransition: true,
+diff -ruN a/apps/web/src/routes/builder/$resumeId/-components/dock.tsx b/apps/web/src/routes/builder/$resumeId/-components/dock.tsx
+--- a/apps/web/src/routes/builder/$resumeId/-components/dock.tsx	2026-07-07 21:18:25.517912262 +0200
++++ b/apps/web/src/routes/builder/$resumeId/-components/dock.tsx	2026-07-07 21:19:09.958410397 +0200
+@@ -74,7 +74,7 @@
+ 
+ 	const publicUrl = useMemo(() => {
+ 		if (!session?.user.username || !resumeSlug) return "";
+-		return `${window.location.origin}/${session.user.username}/${resumeSlug}`;
++		return `${window.location.origin}${import.meta.env.BASE_URL}${session.user.username}/${resumeSlug}`;
+ 	}, [session?.user.username, resumeSlug]);
+ 
+ 	const onCopyUrl = useCallback(async () => {
+diff -ruN a/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx b/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx
+--- a/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx	2026-07-07 21:18:25.561912756 +0200
++++ b/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx	2026-07-07 21:19:09.958410397 +0200
+@@ -368,13 +368,13 @@
+ 
+ function normalizePictureUrl(url: string, origin: string): string {
+ 	if (!url) return url;
+-	if (url.startsWith("/uploads/")) return `/api${url}`;
++	if (url.startsWith("/uploads/")) return `${import.meta.env.BASE_URL}api${url}`;
+ 
+ 	try {
+ 		const parsed = new URL(url, origin);
+ 		if (parsed.origin !== origin) return url;
+ 		if (!parsed.pathname.startsWith("/uploads/")) return url;
+-		return `/api${parsed.pathname}${parsed.search}${parsed.hash}`;
++		return `${import.meta.env.BASE_URL}api${parsed.pathname}${parsed.search}${parsed.hash}`;
+ 	} catch {
+ 		return url;
+ 	}
+diff -ruN a/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx b/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx
+--- a/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx	2026-07-07 21:18:25.533912441 +0200
++++ b/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx	2026-07-07 21:19:09.958410397 +0200
+@@ -31,7 +31,7 @@
+ 
+ 	const publicUrl = useMemo(() => {
+ 		if (!session) return "";
+-		return `${window.location.origin}/${session.user.username}/${resume.slug}`;
++		return `${window.location.origin}${import.meta.env.BASE_URL}${session.user.username}/${resume.slug}`;
+ 	}, [session, resume]);
+ 
+ 	const onCopyUrl = useCallback(async () => {
+diff -ruN a/apps/web/vite.config.ts b/apps/web/vite.config.ts
+--- a/apps/web/vite.config.ts	2026-07-07 21:18:25.461911633 +0200
++++ b/apps/web/vite.config.ts	2026-07-07 21:19:09.954410352 +0200
+@@ -28,6 +28,7 @@
+ );
+ 
+ export default defineConfig({
++	base: process.env.APP_BASE_PATH || "/",
+ 	envDir: workspaceRoot,
+ 
+ 	resolve: {
+diff -ruN a/packages/api/src/features/resume/pdf-download-url.ts b/packages/api/src/features/resume/pdf-download-url.ts
+--- a/packages/api/src/features/resume/pdf-download-url.ts	2026-07-07 21:18:25.597913160 +0200
++++ b/packages/api/src/features/resume/pdf-download-url.ts	2026-07-07 21:19:09.958410397 +0200
+@@ -92,7 +92,7 @@
+ 		issuedAt: now.getTime(),
+ 	} satisfies PdfDownloadTokenPayload);
+ 	const token = `${payload}.${sign(payload)}`;
+-	const url = new URL(`/api/resumes/${encodeURIComponent(resumeId)}/pdf`, env.APP_URL);
++	const url = new URL(`${env.APP_URL}/api/resumes/${encodeURIComponent(resumeId)}/pdf`);
+ 	url.searchParams.set("token", token);
+ 	if (target) url.searchParams.set("target", target);
+ 
+diff -ruN a/packages/api/src/features/storage/service.ts b/packages/api/src/features/storage/service.ts
+--- a/packages/api/src/features/storage/service.ts	2026-07-07 21:18:25.613913340 +0200
++++ b/packages/api/src/features/storage/service.ts	2026-07-07 21:19:09.962410441 +0200
+@@ -75,7 +75,7 @@
+ function buildPublicUrl(path: string): string {
+ 	const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+ 	const apiPath = normalizedPath.startsWith("/api/") ? normalizedPath : `/api${normalizedPath}`;
+-	return new URL(apiPath, env.APP_URL).toString();
++	return new URL(env.APP_URL + apiPath).toString();
+ }
+ 
+ export function inferContentType(filename: string): string {
+diff -ruN a/packages/auth/src/config.ts b/packages/auth/src/config.ts
+--- a/packages/auth/src/config.ts	2026-07-07 21:18:25.581912980 +0200
++++ b/packages/auth/src/config.ts	2026-07-07 21:19:09.958410397 +0200
+@@ -92,7 +92,7 @@
+ 
+ 	return betterAuth({
+ 		appName: "Reactive Resume",
+-		baseURL: authBaseUrl,
++		baseURL: new URL(authBaseUrl).origin,
+ 		secret: env.AUTH_SECRET,
+ 
+ 		database: drizzleAdapter(db, { schema, provider: "pg" }),

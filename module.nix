@@ -30,7 +30,9 @@ self:
 
 let
   cfg = config.services.reactive-resume;
-  defaultPackage = pkgs.callPackage (self + "/package.nix") { };
+  defaultPackage = pkgs.callPackage (self + "/package.nix") {
+    inherit (cfg) appBasePath;
+  };
 
   appEnv = {
     NODE_ENV = "production";
@@ -66,8 +68,24 @@ in
       type = lib.types.str;
       example = "https://resume.example.ts.net";
       description = ''
-        Public origin (scheme://host[:port]) the app is served from → APP_URL.
-        Used for absolute links and auth callbacks.
+        Public URL the app is served from → APP_URL. Used for absolute links and
+        auth callbacks. When serving behind a reverse-proxy sub-path, include the
+        path here (e.g. "https://host/rxresume") and set `appBasePath` to match.
+      '';
+    };
+
+    appBasePath = lib.mkOption {
+      type = lib.types.str;
+      default = "/";
+      example = "/rxresume/";
+      description = ''
+        URL sub-path the SPA is built for (Vite `base`). "/" serves at the web
+        root (default). To serve behind a reverse-proxy prefix, set this to that
+        prefix WITH a trailing slash (e.g. "/rxresume/") — it rebuilds the
+        package (router basepath + client/server URL bases derive from it), and
+        `appUrl` should carry the same path (e.g. "https://host/rxresume").
+        The reverse-proxy must strip the prefix before forwarding (the server is
+        root-native).
       '';
     };
 
