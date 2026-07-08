@@ -41,7 +41,7 @@ diff -ruN a/apps/web/src/libs/auth/client.ts b/apps/web/src/libs/auth/client.ts
  
  const getAuthClient = () => {
  	return createAuthClient({
-+		baseURL: typeof window === "undefined" ? undefined : (window.location.origin + import.meta.env.BASE_URL).replace(/\/+$/, ""),
++		baseURL: typeof window === "undefined" ? undefined : window.location.origin + import.meta.env.BASE_URL + "api/auth",
  		plugins: [
  			dashClient(),
  			adminClient(),
