@@ -158,3 +158,154 @@ diff -ruN a/packages/auth/src/config.ts b/packages/auth/src/config.ts
  		secret: env.AUTH_SECRET,
  
  		database: drizzleAdapter(db, { schema, provider: "pg" }),
+diff -ruN a/apps/web/src/components/layout/error-screen.tsx b/apps/web/src/components/layout/error-screen.tsx
+--- a/apps/web/src/components/layout/error-screen.tsx	2026-07-08 12:51:23.307822847 +0200
++++ b/apps/web/src/components/layout/error-screen.tsx	2026-07-08 12:51:50.228099135 +0200
+@@ -1,3 +1,5 @@
++import { i18n } from "@lingui/core";
++import { I18nProvider } from "@lingui/react";
+ import type { ErrorComponentProps } from "@tanstack/react-router";
+ import { Trans } from "@lingui/react/macro";
+ import { ArrowClockwiseIcon, HouseIcon, WarningIcon } from "@phosphor-icons/react";
+@@ -8,30 +10,32 @@
+ 
+ export function ErrorScreen({ reset }: ErrorComponentProps) {
+ 	return (
+-		<div className="mx-auto flex h-svh max-w-md flex-col items-center justify-center gap-y-4">
+-			<BrandIcon variant="logo" className="size-12" />
+-
+-			<Alert>
+-				<WarningIcon />
+-				<AlertTitle>
+-					<Trans>Something went wrong</Trans>
+-				</AlertTitle>
+-				<AlertDescription>
+-					<Trans>An unexpected error stopped this page from loading. You can try again or head back.</Trans>
+-				</AlertDescription>
+-			</Alert>
+-
+-			<div className="flex items-center gap-x-2">
+-				<Button onClick={reset}>
+-					<ArrowClockwiseIcon />
+-					<Trans>Try again</Trans>
+-				</Button>
+-
+-				<Link to="/dashboard" className={buttonVariants({ variant: "secondary" })}>
+-					<HouseIcon />
+-					<Trans>Go to dashboard</Trans>
+-				</Link>
++		<I18nProvider i18n={i18n}>
++					<div className="mx-auto flex h-svh max-w-md flex-col items-center justify-center gap-y-4">
++				<BrandIcon variant="logo" className="size-12" />
++	
++				<Alert>
++					<WarningIcon />
++					<AlertTitle>
++						<Trans>Something went wrong</Trans>
++					</AlertTitle>
++					<AlertDescription>
++						<Trans>An unexpected error stopped this page from loading. You can try again or head back.</Trans>
++					</AlertDescription>
++				</Alert>
++	
++				<div className="flex items-center gap-x-2">
++					<Button onClick={reset}>
++						<ArrowClockwiseIcon />
++						<Trans>Try again</Trans>
++					</Button>
++	
++					<Link to="/dashboard" className={buttonVariants({ variant: "secondary" })}>
++						<HouseIcon />
++						<Trans>Go to dashboard</Trans>
++					</Link>
++				</div>
+ 			</div>
+-		</div>
++		</I18nProvider>
+ 	);
+ }
+diff -ruN a/apps/web/src/components/layout/not-found-screen.tsx b/apps/web/src/components/layout/not-found-screen.tsx
+--- a/apps/web/src/components/layout/not-found-screen.tsx	2026-07-08 12:51:24.151831509 +0200
++++ b/apps/web/src/components/layout/not-found-screen.tsx	2026-07-08 12:51:50.232099176 +0200
+@@ -1,3 +1,5 @@
++import { i18n } from "@lingui/core";
++import { I18nProvider } from "@lingui/react";
+ import { Trans } from "@lingui/react/macro";
+ import { HouseIcon, MagnifyingGlassIcon, WarningIcon } from "@phosphor-icons/react";
+ import { Link } from "@tanstack/react-router";
+@@ -7,30 +9,32 @@
+ 
+ export function NotFoundScreen() {
+ 	return (
+-		<div className="mx-auto flex h-svh max-w-md flex-col items-center justify-center gap-y-4">
+-			<BrandIcon variant="logo" className="size-12" />
+-
+-			<Alert>
+-				<WarningIcon />
+-				<AlertTitle>
+-					<Trans>We couldn't find that page</Trans>
+-				</AlertTitle>
+-				<AlertDescription>
+-					<Trans>The page you're looking for may have been moved or no longer exists.</Trans>
+-				</AlertDescription>
+-			</Alert>
+-
+-			<div className="flex items-center gap-x-2">
+-				<Link to="/dashboard" className={buttonVariants()}>
+-					<MagnifyingGlassIcon />
+-					<Trans>Go to dashboard</Trans>
+-				</Link>
+-
+-				<Link to="/" className={buttonVariants({ variant: "secondary" })}>
+-					<HouseIcon />
+-					<Trans>Go home</Trans>
+-				</Link>
++		<I18nProvider i18n={i18n}>
++					<div className="mx-auto flex h-svh max-w-md flex-col items-center justify-center gap-y-4">
++				<BrandIcon variant="logo" className="size-12" />
++	
++				<Alert>
++					<WarningIcon />
++					<AlertTitle>
++						<Trans>We couldn't find that page</Trans>
++					</AlertTitle>
++					<AlertDescription>
++						<Trans>The page you're looking for may have been moved or no longer exists.</Trans>
++					</AlertDescription>
++				</Alert>
++	
++				<div className="flex items-center gap-x-2">
++					<Link to="/dashboard" className={buttonVariants()}>
++						<MagnifyingGlassIcon />
++						<Trans>Go to dashboard</Trans>
++					</Link>
++	
++					<Link to="/" className={buttonVariants({ variant: "secondary" })}>
++						<HouseIcon />
++						<Trans>Go home</Trans>
++					</Link>
++				</div>
+ 			</div>
+-		</div>
++		</I18nProvider>
+ 	);
+ }
+diff -ruN a/packages/ui/src/components/brand-icon.tsx b/packages/ui/src/components/brand-icon.tsx
+--- a/packages/ui/src/components/brand-icon.tsx	2026-07-08 12:51:10.559692011 +0200
++++ b/packages/ui/src/components/brand-icon.tsx	2026-07-08 12:51:50.228099135 +0200
+@@ -8,13 +8,13 @@
+ 	return (
+ 		<>
+ 			<img
+-				src={`/${variant}/dark.svg`}
++				src={`${import.meta.env.BASE_URL}${variant}/dark.svg`}
+ 				alt="Reactive Resume"
+ 				className={cn("hidden size-12 dark:block", className)}
+ 				{...props}
+ 			/>
+ 			<img
+-				src={`/${variant}/light.svg`}
++				src={`${import.meta.env.BASE_URL}${variant}/light.svg`}
+ 				alt="Reactive Resume"
+ 				className={cn("block size-12 dark:hidden", className)}
+ 				{...props}
