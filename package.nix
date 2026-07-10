@@ -104,6 +104,22 @@ stdenv.mkDerivation (finalAttrs: {
   # stock root-served app.
   patches = [ ./patches/base-path-support.patch ];
 
+  # oRPC request batching (BatchLinkPlugin) embeds each sub-request's ABSOLUTE
+  # URL — including the base path — in the batch POST body. Behind a reverse
+  # proxy that strips the base-path prefix before forwarding, the backend (RPC
+  # handler mounted at /api/rpc) cannot route those inner /<base>/api/rpc/...
+  # paths, so every batched query fails with 404 "No procedure matched". The
+  # symptom is a dashboard whose initial (batched) draw is empty while single
+  # requests (e.g. a sort/filter change) work. Disable batching for sub-path
+  # builds so each query is an individual request whose outer path the proxy
+  # strips correctly. No-op at APP_BASE_PATH=/ (batching left intact for the
+  # stock root-served app, where the embedded URLs resolve fine).
+  postPatch = lib.optionalString (appBasePath != "/") ''
+    substituteInPlace apps/web/src/libs/orpc/client.ts \
+      --replace-fail 'groups: [{ condition: () => true, context: {} }]' \
+                     'groups: [{ condition: () => false, context: {} }]'
+  '';
+
   nativeBuildInputs = [
     nodejs_24
     pnpm_11
