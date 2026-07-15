@@ -6,11 +6,11 @@
   },
   "customManagers": [
     {
-      "description": "Track Reactive Resume upstream releases in package.nix",
+      "description": "Track Reactive Resume upstream releases in package.nix (anchored on pname so it does not also match the pnpm_11 version pin)",
       "customType": "regex",
-      "fileMatch": ["^package\\.nix$"],
+      "managerFilePatterns": ["/^package\\.nix$/"],
       "matchStrings": [
-        "version\\s*=\\s*\"(?<currentValue>[^\"]+)\";"
+        "pname = \"reactive-resume\";\\s+version = \"(?<currentValue>[^\"]+)\";"
       ],
       "depNameTemplate": "amruthpillai/Reactive-Resume",
       "datasourceTemplate": "github-releases",
@@ -25,10 +25,15 @@
       "schedule": ["every weekend"]
     },
     {
-      "description": "Reactive Resume upstream — src + pnpmDeps hashes must be bumped by hand after the version PR (see README)",
+      "description": "Reactive Resume upstream — ci/renovate-update.sh recomputes src + pnpmDeps hashes so the PR is build-ready",
       "matchDepNames": ["amruthpillai/Reactive-Resume"],
       "automerge": false,
-      "schedule": ["at any time"]
+      "schedule": ["at any time"],
+      "postUpgradeTasks": {
+        "commands": ["bash ci/renovate-update.sh {{{newVersion}}}"],
+        "executionMode": "branch",
+        "fileFilters": ["**/*"]
+      }
     }
   ]
 }
