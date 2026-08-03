@@ -79,20 +79,20 @@ let
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "reactive-resume";
-  version = "5.2.3";
+  version = "5.2.5";
 
   src = fetchFromGitHub {
     owner = "amruthpillai";
     repo = "reactive-resume";
     rev = "v${finalAttrs.version}";
-    hash = "sha256-44Ek/PgU+WXCvNBZGUUguYyR0rDq3AdA47b9OHpugpQ=";
+    hash = "sha256-TslwG4PQ31A7r5K8TGa2/5EgQ9cdgkjS17238twyVvM=";
   };
 
   pnpmDeps = fetchPnpmDeps {
     inherit (finalAttrs) pname version src;
     pnpm = pnpm_11;
     fetcherVersion = 3;
-    hash = "sha256-dnUCmN7SX22MIq73wzhYQkV3zAG4W4TrTcRRlxrEFxM=";
+    hash = "sha256-PKmM5Ulv9ev/AzvcASt6HRnxd3GjsqRTXwhCtuKFUCA=";
   };
 
   # Base-path (URL sub-path) support. Rewrites the ~13 client/server sites that
