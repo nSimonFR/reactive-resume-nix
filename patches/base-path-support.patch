@@ -10,18 +10,6 @@ diff -ruN a/apps/server/src/http/auth.ts b/apps/server/src/http/auth.ts
  	const oauthParams = new URLSearchParams();
  	for (const [key, value] of url.searchParams) {
  		if (!oauthCallbackPassthroughExcludedParams.has(key)) {
-diff -ruN a/apps/server/src/static/uploads.ts b/apps/server/src/static/uploads.ts
---- a/apps/server/src/static/uploads.ts	2026-07-07 21:18:25.641913654 +0200
-+++ b/apps/server/src/static/uploads.ts	2026-07-07 21:19:09.962410441 +0200
-@@ -41,7 +41,7 @@
- 	headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
- 	headers.set("X-Frame-Options", "DENY");
- 	headers.set("X-Download-Options", "noopen");
--	headers.set("Access-Control-Allow-Origin", env.APP_URL);
-+	headers.set("Access-Control-Allow-Origin", new URL(env.APP_URL).origin);
- 
- 	return new Response(toArrayBuffer(storedFile.data), { headers });
- }
 diff -ruN a/apps/web/src/dialogs/resume/index.tsx b/apps/web/src/dialogs/resume/index.tsx
 --- a/apps/web/src/dialogs/resume/index.tsx	2026-07-07 21:18:25.549912621 +0200
 +++ b/apps/web/src/dialogs/resume/index.tsx	2026-07-07 21:19:09.958410397 +0200
