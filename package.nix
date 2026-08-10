@@ -102,6 +102,14 @@ stdenv.mkDerivation (finalAttrs: {
   # patch does not touch package.json / pnpm-lock.yaml, so pnpmDeps is unchanged.
   # It is a no-op at APP_BASE_PATH=/ (the default), so the default build is the
   # stock root-served app.
+  #
+  # 5.2.3 dropped one hunk: apps/server/src/static/uploads.ts used to send
+  # `Access-Control-Allow-Origin: env.APP_URL`, which is not a valid origin once
+  # APP_URL carries a sub-path — the hunk narrowed it to `new URL(…).origin`.
+  # Upstream deleted that header outright in 5.2.3, so the hunk is obsolete, not
+  # merely misplaced: there is nothing left to narrow, and uploads are served
+  # same-origin anyway. Re-anchoring it would have re-introduced a header upstream
+  # deliberately removed.
   patches = [ ./patches/base-path-support.patch ];
 
   # oRPC request batching (BatchLinkPlugin) embeds each sub-request's ABSOLUTE
