@@ -122,7 +122,20 @@ stdenv.mkDerivation (finalAttrs: {
   # builds so each query is an individual request whose outer path the proxy
   # strips correctly. No-op at APP_BASE_PATH=/ (batching left intact for the
   # stock root-served app, where the embedded URLs resolve fine).
-  postPatch = lib.optionalString (appBasePath != "/") ''
+  #
+  # The PWA manifest is a static file under apps/web/public/, which Vite copies
+  # VERBATIM — the `base` rewrite that re-roots index.html's root-absolute hrefs
+  # (favicon, apple-touch-icon, the manifest link itself) never reaches its
+  # contents. So `id`/`start_url`/`scope` stay pinned to the domain root: an
+  # installed PWA is scoped to, and launches at, whatever else is hosted there.
+  # Re-root them on appBasePath (identity at the default "/"). The icon `src`s
+  # are already relative, so they resolve against the manifest's own URL.
+  postPatch = ''
+    substituteInPlace apps/web/public/manifest.webmanifest \
+      --replace-fail '"id": "/?source=pwa"' '"id": "${appBasePath}?source=pwa"' \
+      --replace-fail '"start_url": "/?source=pwa"' '"start_url": "${appBasePath}?source=pwa"' \
+      --replace-fail '"scope": "/"' '"scope": "${appBasePath}"'
+  '' + lib.optionalString (appBasePath != "/") ''
     substituteInPlace apps/web/src/libs/orpc/client.ts \
       --replace-fail 'groups: [{ condition: () => true, context: {} }]' \
                      'groups: [{ condition: () => false, context: {} }]'
