@@ -110,6 +110,22 @@ stdenv.mkDerivation (finalAttrs: {
   # merely misplaced: there is nothing left to narrow, and uploads are served
   # same-origin anyway. Re-anchoring it would have re-introduced a header upstream
   # deliberately removed.
+  #
+  # 5.2.5 needed four hunks re-anchored — same intent, code merely reshaped:
+  # `authClient` stopped being built by a `getAuthClient()` factory and became a
+  # top-level const; `dock.tsx` and `sharing.tsx` collapsed their `publicUrl`
+  # useMemos into one-line ternaries; `orpc/client.ts` only drifted by line number.
+  # It also GREW three: 5.2.5 moved the icon / apple-touch-icon / manifest <link>s
+  # (and the home page's video preload) out of apps/web/index.html — where Vite
+  # re-roots root-absolute hrefs against `base` for free — into TanStack Router
+  # `head()` blocks, where they are runtime strings Vite never touches. Left alone
+  # they 404 under a sub-path, taking the PWA install with them. `seo.ts` is the
+  # third: getCanonicalRootUrl pinned `url.pathname = "/"`, so the canonical URL
+  # and the og:image `${base}templates/jpg/…` both pointed at the domain root.
+  # Two more public assets were never covered at any version and surfaced in the
+  # same sweep: the home hero <video>'s poster/src, and the new-resume dialog's
+  # 15 template thumbnails (prefixed in gallery.tsx at the point of use, not in
+  # template/data.ts, so data.test.ts's `toMatch(/^\/templates\//)` stays honest).
   patches = [ ./patches/base-path-support.patch ];
 
   # oRPC request batching (BatchLinkPlugin) embeds each sub-request's ABSOLUTE

@@ -1,6 +1,6 @@
-diff -ruN a/apps/server/src/http/auth.ts b/apps/server/src/http/auth.ts
---- a/apps/server/src/http/auth.ts	2026-07-07 21:18:25.629913519 +0200
-+++ b/apps/server/src/http/auth.ts	2026-07-07 21:19:09.962410441 +0200
+diff -ruN rr525-orig/apps/server/src/http/auth.ts rr525/apps/server/src/http/auth.ts
+--- a/apps/server/src/http/auth.ts	2026-08-16 12:45:25.581987614 +0200
++++ b/apps/server/src/http/auth.ts	2026-08-16 12:42:42.477002289 +0200
 @@ -198,7 +198,7 @@
  		});
  	}
@@ -10,145 +10,9 @@ diff -ruN a/apps/server/src/http/auth.ts b/apps/server/src/http/auth.ts
  	const oauthParams = new URLSearchParams();
  	for (const [key, value] of url.searchParams) {
  		if (!oauthCallbackPassthroughExcludedParams.has(key)) {
-diff -ruN a/apps/web/src/dialogs/resume/index.tsx b/apps/web/src/dialogs/resume/index.tsx
---- a/apps/web/src/dialogs/resume/index.tsx	2026-07-07 21:18:25.549912621 +0200
-+++ b/apps/web/src/dialogs/resume/index.tsx	2026-07-07 21:19:09.958410397 +0200
-@@ -344,7 +344,7 @@
- 	render: function ResumeFormRenderer({ form }) {
- 		const { data: session } = authClient.useSession();
- 
--		const slugPrefix = `${window.location.origin}/${session?.user.username ?? ""}/`;
-+		const slugPrefix = `${window.location.origin}${import.meta.env.BASE_URL}${session?.user.username ?? ""}/`;
- 
- 		const onGenerateName = () => {
- 			form.setFieldValue("name", generateRandomName());
-diff -ruN a/apps/web/src/libs/auth/client.ts b/apps/web/src/libs/auth/client.ts
---- a/apps/web/src/libs/auth/client.ts	2026-07-07 21:18:25.505912127 +0200
-+++ b/apps/web/src/libs/auth/client.ts	2026-07-07 21:19:09.954410352 +0200
-@@ -15,6 +15,7 @@
- 
- const getAuthClient = () => {
- 	return createAuthClient({
-+		baseURL: typeof window === "undefined" ? undefined : window.location.origin + import.meta.env.BASE_URL + "api/auth",
- 		plugins: [
- 			dashClient(),
- 			adminClient(),
-diff -ruN a/apps/web/src/libs/orpc/client.ts b/apps/web/src/libs/orpc/client.ts
---- a/apps/web/src/libs/orpc/client.ts	2026-07-07 21:18:25.489911947 +0200
-+++ b/apps/web/src/libs/orpc/client.ts	2026-07-07 21:19:09.954410352 +0200
-@@ -7,7 +7,7 @@
- 
- const getRpcUrl = () => {
- 	if (typeof window === "undefined") return "http://localhost:3000/api/rpc";
--	return `${window.location.origin}/api/rpc`;
-+	return `${window.location.origin}${import.meta.env.BASE_URL}api/rpc`;
- };
- 
- const createRpcClient = (): RouterClient<typeof router> => {
-diff -ruN a/apps/web/src/router.tsx b/apps/web/src/router.tsx
---- a/apps/web/src/router.tsx	2026-07-07 21:18:25.473911767 +0200
-+++ b/apps/web/src/router.tsx	2026-07-07 21:19:09.954410352 +0200
-@@ -22,6 +22,7 @@
- 	await loadLocale(locale);
- 
- 	const router = createRouter({
-+		basepath: (import.meta.env.BASE_URL || "/").replace(/\/+$/, "") || "/",
- 		routeTree,
- 		scrollRestoration: true,
- 		defaultViewTransition: true,
-diff -ruN a/apps/web/src/routes/builder/$resumeId/-components/dock.tsx b/apps/web/src/routes/builder/$resumeId/-components/dock.tsx
---- a/apps/web/src/routes/builder/$resumeId/-components/dock.tsx	2026-07-07 21:18:25.517912262 +0200
-+++ b/apps/web/src/routes/builder/$resumeId/-components/dock.tsx	2026-07-07 21:19:09.958410397 +0200
-@@ -74,7 +74,7 @@
- 
- 	const publicUrl = useMemo(() => {
- 		if (!session?.user.username || !resumeSlug) return "";
--		return `${window.location.origin}/${session.user.username}/${resumeSlug}`;
-+		return `${window.location.origin}${import.meta.env.BASE_URL}${session.user.username}/${resumeSlug}`;
- 	}, [session?.user.username, resumeSlug]);
- 
- 	const onCopyUrl = useCallback(async () => {
-diff -ruN a/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx b/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx
---- a/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx	2026-07-07 21:18:25.561912756 +0200
-+++ b/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx	2026-07-07 21:19:09.958410397 +0200
-@@ -368,13 +368,13 @@
- 
- function normalizePictureUrl(url: string, origin: string): string {
- 	if (!url) return url;
--	if (url.startsWith("/uploads/")) return `/api${url}`;
-+	if (url.startsWith("/uploads/")) return `${import.meta.env.BASE_URL}api${url}`;
- 
- 	try {
- 		const parsed = new URL(url, origin);
- 		if (parsed.origin !== origin) return url;
- 		if (!parsed.pathname.startsWith("/uploads/")) return url;
--		return `/api${parsed.pathname}${parsed.search}${parsed.hash}`;
-+		return `${import.meta.env.BASE_URL}api${parsed.pathname}${parsed.search}${parsed.hash}`;
- 	} catch {
- 		return url;
- 	}
-diff -ruN a/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx b/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx
---- a/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx	2026-07-07 21:18:25.533912441 +0200
-+++ b/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx	2026-07-07 21:19:09.958410397 +0200
-@@ -31,7 +31,7 @@
- 
- 	const publicUrl = useMemo(() => {
- 		if (!session) return "";
--		return `${window.location.origin}/${session.user.username}/${resume.slug}`;
-+		return `${window.location.origin}${import.meta.env.BASE_URL}${session.user.username}/${resume.slug}`;
- 	}, [session, resume]);
- 
- 	const onCopyUrl = useCallback(async () => {
-diff -ruN a/apps/web/vite.config.ts b/apps/web/vite.config.ts
---- a/apps/web/vite.config.ts	2026-07-07 21:18:25.461911633 +0200
-+++ b/apps/web/vite.config.ts	2026-07-07 21:19:09.954410352 +0200
-@@ -28,6 +28,7 @@
- );
- 
- export default defineConfig({
-+	base: process.env.APP_BASE_PATH || "/",
- 	envDir: workspaceRoot,
- 
- 	resolve: {
-diff -ruN a/packages/api/src/features/resume/pdf-download-url.ts b/packages/api/src/features/resume/pdf-download-url.ts
---- a/packages/api/src/features/resume/pdf-download-url.ts	2026-07-07 21:18:25.597913160 +0200
-+++ b/packages/api/src/features/resume/pdf-download-url.ts	2026-07-07 21:19:09.958410397 +0200
-@@ -92,7 +92,7 @@
- 		issuedAt: now.getTime(),
- 	} satisfies PdfDownloadTokenPayload);
- 	const token = `${payload}.${sign(payload)}`;
--	const url = new URL(`/api/resumes/${encodeURIComponent(resumeId)}/pdf`, env.APP_URL);
-+	const url = new URL(`${env.APP_URL}/api/resumes/${encodeURIComponent(resumeId)}/pdf`);
- 	url.searchParams.set("token", token);
- 	if (target) url.searchParams.set("target", target);
- 
-diff -ruN a/packages/api/src/features/storage/service.ts b/packages/api/src/features/storage/service.ts
---- a/packages/api/src/features/storage/service.ts	2026-07-07 21:18:25.613913340 +0200
-+++ b/packages/api/src/features/storage/service.ts	2026-07-07 21:19:09.962410441 +0200
-@@ -75,7 +75,7 @@
- function buildPublicUrl(path: string): string {
- 	const normalizedPath = path.startsWith("/") ? path : `/${path}`;
- 	const apiPath = normalizedPath.startsWith("/api/") ? normalizedPath : `/api${normalizedPath}`;
--	return new URL(apiPath, env.APP_URL).toString();
-+	return new URL(env.APP_URL + apiPath).toString();
- }
- 
- export function inferContentType(filename: string): string {
-diff -ruN a/packages/auth/src/config.ts b/packages/auth/src/config.ts
---- a/packages/auth/src/config.ts	2026-07-07 21:18:25.581912980 +0200
-+++ b/packages/auth/src/config.ts	2026-07-07 21:19:09.958410397 +0200
-@@ -92,7 +92,7 @@
- 
- 	return betterAuth({
- 		appName: "Reactive Resume",
--		baseURL: authBaseUrl,
-+		baseURL: new URL(authBaseUrl).origin,
- 		secret: env.AUTH_SECRET,
- 
- 		database: drizzleAdapter(db, { schema, provider: "pg" }),
-diff -ruN a/apps/web/src/components/layout/error-screen.tsx b/apps/web/src/components/layout/error-screen.tsx
---- a/apps/web/src/components/layout/error-screen.tsx	2026-07-08 12:51:23.307822847 +0200
-+++ b/apps/web/src/components/layout/error-screen.tsx	2026-07-08 12:51:50.228099135 +0200
+diff -ruN rr525-orig/apps/web/src/components/layout/error-screen.tsx rr525/apps/web/src/components/layout/error-screen.tsx
+--- a/apps/web/src/components/layout/error-screen.tsx	2026-08-16 12:45:25.736235535 +0200
++++ b/apps/web/src/components/layout/error-screen.tsx	2026-08-16 12:42:42.479914574 +0200
 @@ -1,3 +1,5 @@
 +import { i18n } from "@lingui/core";
 +import { I18nProvider } from "@lingui/react";
@@ -212,9 +76,9 @@ diff -ruN a/apps/web/src/components/layout/error-screen.tsx b/apps/web/src/compo
 +		</I18nProvider>
  	);
  }
-diff -ruN a/apps/web/src/components/layout/not-found-screen.tsx b/apps/web/src/components/layout/not-found-screen.tsx
---- a/apps/web/src/components/layout/not-found-screen.tsx	2026-07-08 12:51:24.151831509 +0200
-+++ b/apps/web/src/components/layout/not-found-screen.tsx	2026-07-08 12:51:50.232099176 +0200
+diff -ruN rr525-orig/apps/web/src/components/layout/not-found-screen.tsx rr525/apps/web/src/components/layout/not-found-screen.tsx
+--- a/apps/web/src/components/layout/not-found-screen.tsx	2026-08-16 12:45:25.737512676 +0200
++++ b/apps/web/src/components/layout/not-found-screen.tsx	2026-08-16 12:42:42.480082020 +0200
 @@ -1,3 +1,5 @@
 +import { i18n } from "@lingui/core";
 +import { I18nProvider } from "@lingui/react";
@@ -278,9 +142,239 @@ diff -ruN a/apps/web/src/components/layout/not-found-screen.tsx b/apps/web/src/c
 +		</I18nProvider>
  	);
  }
-diff -ruN a/packages/ui/src/components/brand-icon.tsx b/packages/ui/src/components/brand-icon.tsx
---- a/packages/ui/src/components/brand-icon.tsx	2026-07-08 12:51:10.559692011 +0200
-+++ b/packages/ui/src/components/brand-icon.tsx	2026-07-08 12:51:50.228099135 +0200
+diff -ruN rr525-orig/apps/web/src/dialogs/resume/index.tsx rr525/apps/web/src/dialogs/resume/index.tsx
+--- a/apps/web/src/dialogs/resume/index.tsx	2026-08-16 12:45:25.746899519 +0200
++++ b/apps/web/src/dialogs/resume/index.tsx	2026-08-16 12:42:42.477389700 +0200
+@@ -344,7 +344,7 @@
+ 	render: function ResumeFormRenderer({ form }) {
+ 		const { data: session } = authClient.useSession();
+ 
+-		const slugPrefix = `${window.location.origin}/${session?.user.username ?? ""}/`;
++		const slugPrefix = `${window.location.origin}${import.meta.env.BASE_URL}${session?.user.username ?? ""}/`;
+ 
+ 		const onGenerateName = () => {
+ 			form.setFieldValue("name", generateRandomName());
+diff -ruN rr525-orig/apps/web/src/dialogs/resume/template/gallery.tsx rr525/apps/web/src/dialogs/resume/template/gallery.tsx
+--- a/apps/web/src/dialogs/resume/template/gallery.tsx	2026-08-16 12:45:25.753658876 +0200
++++ b/apps/web/src/dialogs/resume/template/gallery.tsx	2026-08-16 12:49:48.812810863 +0200
+@@ -98,6 +98,8 @@
+ };
+ 
+ function TemplateCard({ id, data, metadata, isActive, onSelect }: TemplateCardProps) {
++	const imageUrl = `${import.meta.env.BASE_URL}${metadata.imageUrl.replace(/^\//, "")}`;
++
+ 	return (
+ 		<CometCard translateDepth={3} rotateDepth={6} glareOpacity={0}>
+ 			<button
+@@ -108,8 +110,8 @@
+ 					isActive && "ring-2 ring-ring ring-offset-4 ring-offset-background",
+ 				)}
+ 			>
+-				<Suspense fallback={<img src={metadata.imageUrl} alt={metadata.name} className="size-full object-cover" />}>
+-					<TemplateLivePreview data={data} template={id} fallbackSrc={metadata.imageUrl} alt={metadata.name} />
++				<Suspense fallback={<img src={imageUrl} alt={metadata.name} className="size-full object-cover" />}>
++					<TemplateLivePreview data={data} template={id} fallbackSrc={imageUrl} alt={metadata.name} />
+ 				</Suspense>
+ 			</button>
+ 
+diff -ruN rr525-orig/apps/web/src/libs/auth/client.ts rr525/apps/web/src/libs/auth/client.ts
+--- a/apps/web/src/libs/auth/client.ts	2026-08-16 12:45:25.788910656 +0200
++++ b/apps/web/src/libs/auth/client.ts	2026-08-16 12:43:58.488581051 +0200
+@@ -14,6 +14,7 @@
+ import { createAuthClient } from "better-auth/react";
+ 
+ export const authClient = createAuthClient({
++	baseURL: typeof window === "undefined" ? undefined : window.location.origin + import.meta.env.BASE_URL + "api/auth",
+ 	plugins: [
+ 		dashClient(),
+ 		adminClient(),
+diff -ruN rr525-orig/apps/web/src/libs/orpc/client.ts rr525/apps/web/src/libs/orpc/client.ts
+--- a/apps/web/src/libs/orpc/client.ts	2026-08-16 12:45:25.790282224 +0200
++++ b/apps/web/src/libs/orpc/client.ts	2026-08-16 12:43:58.488100824 +0200
+@@ -7,7 +7,7 @@
+ 
+ const getRpcUrl = () => {
+ 	if (typeof window === "undefined") return "http://localhost:3000/api/rpc";
+-	return `${window.location.origin}/api/rpc`;
++	return `${window.location.origin}${import.meta.env.BASE_URL}api/rpc`;
+ };
+ 
+ export const client: RouterClient<typeof router> = createORPCClient(
+diff -ruN rr525-orig/apps/web/src/libs/seo.ts rr525/apps/web/src/libs/seo.ts
+--- a/apps/web/src/libs/seo.ts	2026-08-16 12:45:25.794133999 +0200
++++ b/apps/web/src/libs/seo.ts	2026-08-16 12:45:17.445853234 +0200
+@@ -8,7 +8,7 @@
+ 	if (!origin) return productionRootUrl;
+ 
+ 	const url = new URL(origin);
+-	url.pathname = "/";
++	url.pathname = import.meta.env.BASE_URL;
+ 	url.search = "";
+ 	url.hash = "";
+ 
+diff -ruN rr525-orig/apps/web/src/router.tsx rr525/apps/web/src/router.tsx
+--- a/apps/web/src/router.tsx	2026-08-16 12:45:25.795513011 +0200
++++ b/apps/web/src/router.tsx	2026-08-16 12:42:42.478160336 +0200
+@@ -22,6 +22,7 @@
+ 	await loadLocale(locale);
+ 
+ 	const router = createRouter({
++		basepath: (import.meta.env.BASE_URL || "/").replace(/\/+$/, "") || "/",
+ 		routeTree,
+ 		scrollRestoration: true,
+ 		defaultViewTransition: true,
+diff -ruN rr525-orig/apps/web/src/routes/builder/$resumeId/-components/dock.tsx rr525/apps/web/src/routes/builder/$resumeId/-components/dock.tsx
+--- a/apps/web/src/routes/builder/$resumeId/-components/dock.tsx	2026-08-16 12:45:25.807887196 +0200
++++ b/apps/web/src/routes/builder/$resumeId/-components/dock.tsx	2026-08-16 12:43:58.489080222 +0200
+@@ -72,7 +72,9 @@
+ 	});
+ 
+ 	const publicUrl =
+-		session?.user.username && resumeSlug ? `${window.location.origin}/${session.user.username}/${resumeSlug}` : "";
++		session?.user.username && resumeSlug
++			? `${window.location.origin}${import.meta.env.BASE_URL}${session.user.username}/${resumeSlug}`
++			: "";
+ 
+ 	return (
+ 		<div className="fixed inset-x-0 bottom-20 flex items-center justify-center md:bottom-4">
+diff -ruN rr525-orig/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx rr525/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx
+--- a/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx	2026-08-16 12:45:25.812552701 +0200
++++ b/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx	2026-08-16 12:42:42.478671637 +0200
+@@ -369,13 +369,13 @@
+ 
+ function normalizePictureUrl(url: string, origin: string): string {
+ 	if (!url) return url;
+-	if (url.startsWith("/uploads/")) return `/api${url}`;
++	if (url.startsWith("/uploads/")) return `${import.meta.env.BASE_URL}api${url}`;
+ 
+ 	try {
+ 		const parsed = new URL(url, origin);
+ 		if (parsed.origin !== origin) return url;
+ 		if (!parsed.pathname.startsWith("/uploads/")) return url;
+-		return `/api${parsed.pathname}${parsed.search}${parsed.hash}`;
++		return `${import.meta.env.BASE_URL}api${parsed.pathname}${parsed.search}${parsed.hash}`;
+ 	} catch {
+ 		return url;
+ 	}
+diff -ruN rr525-orig/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx rr525/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx
+--- a/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx	2026-08-16 12:45:25.820463106 +0200
++++ b/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx	2026-08-16 12:43:58.489560133 +0200
+@@ -29,7 +29,9 @@
+ 	const { mutateAsync: setPassword } = useMutation(orpc.resume.setPassword.mutationOptions());
+ 	const { mutateAsync: removePassword } = useMutation(orpc.resume.removePassword.mutationOptions());
+ 
+-	const publicUrl = session ? `${window.location.origin}/${session.user.username}/${resume.slug}` : "";
++	const publicUrl = session
++		? `${window.location.origin}${import.meta.env.BASE_URL}${session.user.username}/${resume.slug}`
++		: "";
+ 
+ 	const onCopyUrl = useCallback(async () => {
+ 		await copyToClipboard(publicUrl);
+diff -ruN rr525-orig/apps/web/src/routes/_home/index.tsx rr525/apps/web/src/routes/_home/index.tsx
+--- a/apps/web/src/routes/_home/index.tsx	2026-08-16 12:45:25.800526741 +0200
++++ b/apps/web/src/routes/_home/index.tsx	2026-08-16 12:45:17.445454009 +0200
+@@ -20,7 +20,12 @@
+ 		return {
+ 			links: [
+ 				{ rel: "canonical", href: canonicalUrl },
+-				{ rel: "preload", href: "/videos/timelapse-v1.webp", as: "image", fetchPriority: "high" },
++				{
++					rel: "preload",
++					href: `${import.meta.env.BASE_URL}videos/timelapse-v1.webp`,
++					as: "image",
++					fetchPriority: "high",
++				},
+ 			],
+ 			scripts: [createRootStructuredDataScript(canonicalUrl)],
+ 		};
+diff -ruN rr525-orig/apps/web/src/routes/_home/-sections/hero.tsx rr525/apps/web/src/routes/_home/-sections/hero.tsx
+--- a/apps/web/src/routes/_home/-sections/hero.tsx	2026-08-16 12:45:25.799061802 +0200
++++ b/apps/web/src/routes/_home/-sections/hero.tsx	2026-08-16 12:49:48.811737872 +0200
+@@ -34,8 +34,8 @@
+ 						preload="none"
+ 						width={1146}
+ 						height={720}
+-						poster="/videos/timelapse-v1.webp"
+-						src="/videos/timelapse-v1.mp4"
++						poster={`${import.meta.env.BASE_URL}videos/timelapse-v1.webp`}
++						src={`${import.meta.env.BASE_URL}videos/timelapse-v1.mp4`}
+ 						aria-label={t`Timelapse demonstration of building a resume with Reactive Resume`}
+ 						className="aspect-[1146/720] w-full rounded-md border object-cover"
+ 					/>
+diff -ruN rr525-orig/apps/web/src/routes/__root.tsx rr525/apps/web/src/routes/__root.tsx
+--- a/apps/web/src/routes/__root.tsx	2026-08-16 12:45:25.796500224 +0200
++++ b/apps/web/src/routes/__root.tsx	2026-08-16 12:45:17.445097913 +0200
+@@ -55,11 +55,16 @@
+ 		return {
+ 			links: [
+ 				// Icons
+-				{ rel: "icon", href: "/favicon.ico", type: "image/x-icon", sizes: "128x128" },
+-				{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml", sizes: "256x256 any" },
+-				{ rel: "apple-touch-icon", href: "/apple-touch-icon-180x180.png", type: "image/png", sizes: "180x180 any" },
++				{ rel: "icon", href: `${import.meta.env.BASE_URL}favicon.ico`, type: "image/x-icon", sizes: "128x128" },
++				{ rel: "icon", href: `${import.meta.env.BASE_URL}favicon.svg`, type: "image/svg+xml", sizes: "256x256 any" },
++				{
++					rel: "apple-touch-icon",
++					href: `${import.meta.env.BASE_URL}apple-touch-icon-180x180.png`,
++					type: "image/png",
++					sizes: "180x180 any",
++				},
+ 				// Manifest
+-				{ rel: "manifest", href: "/manifest.webmanifest", crossOrigin: "use-credentials" },
++				{ rel: "manifest", href: `${import.meta.env.BASE_URL}manifest.webmanifest`, crossOrigin: "use-credentials" },
+ 			],
+ 			meta: [
+ 				{ title },
+diff -ruN rr525-orig/apps/web/vite.config.ts rr525/apps/web/vite.config.ts
+--- a/apps/web/vite.config.ts	2026-08-16 12:45:25.833402611 +0200
++++ b/apps/web/vite.config.ts	2026-08-16 12:42:42.479148845 +0200
+@@ -28,6 +28,7 @@
+ );
+ 
+ export default defineConfig({
++	base: process.env.APP_BASE_PATH || "/",
+ 	envDir: workspaceRoot,
+ 
+ 	resolve: {
+diff -ruN rr525-orig/packages/api/src/features/resume/pdf-download-url.ts rr525/packages/api/src/features/resume/pdf-download-url.ts
+--- a/packages/api/src/features/resume/pdf-download-url.ts	2026-08-16 12:45:25.976779268 +0200
++++ b/packages/api/src/features/resume/pdf-download-url.ts	2026-08-16 12:42:42.479349699 +0200
+@@ -92,7 +92,7 @@
+ 		issuedAt: now.getTime(),
+ 	} satisfies PdfDownloadTokenPayload);
+ 	const token = `${payload}.${sign(payload)}`;
+-	const url = new URL(`/api/resumes/${encodeURIComponent(resumeId)}/pdf`, env.APP_URL);
++	const url = new URL(`${env.APP_URL}/api/resumes/${encodeURIComponent(resumeId)}/pdf`);
+ 	url.searchParams.set("token", token);
+ 	if (target) url.searchParams.set("target", target);
+ 
+diff -ruN rr525-orig/packages/api/src/features/storage/service.ts rr525/packages/api/src/features/storage/service.ts
+--- a/packages/api/src/features/storage/service.ts	2026-08-16 12:45:25.985608810 +0200
++++ b/packages/api/src/features/storage/service.ts	2026-08-16 12:42:42.479540108 +0200
+@@ -75,7 +75,7 @@
+ function buildPublicUrl(path: string): string {
+ 	const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+ 	const apiPath = normalizedPath.startsWith("/api/") ? normalizedPath : `/api${normalizedPath}`;
+-	return new URL(apiPath, env.APP_URL).toString();
++	return new URL(env.APP_URL + apiPath).toString();
+ }
+ 
+ export function inferContentType(filename: string): string {
+diff -ruN rr525-orig/packages/auth/src/config.ts rr525/packages/auth/src/config.ts
+--- a/packages/auth/src/config.ts	2026-08-16 12:45:25.988754931 +0200
++++ b/packages/auth/src/config.ts	2026-08-16 12:42:42.479725961 +0200
+@@ -92,7 +92,7 @@
+ 
+ 	return betterAuth({
+ 		appName: "Reactive Resume",
+-		baseURL: authBaseUrl,
++		baseURL: new URL(authBaseUrl).origin,
+ 		secret: env.AUTH_SECRET,
+ 
+ 		database: drizzleAdapter(db, { schema, provider: "pg" }),
+diff -ruN rr525-orig/packages/ui/src/components/brand-icon.tsx rr525/packages/ui/src/components/brand-icon.tsx
+--- a/packages/ui/src/components/brand-icon.tsx	2026-08-16 12:45:26.141640710 +0200
++++ b/packages/ui/src/components/brand-icon.tsx	2026-08-16 12:42:42.480242244 +0200
 @@ -8,13 +8,13 @@
  	return (
  		<>
