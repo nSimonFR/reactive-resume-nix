@@ -15,11 +15,19 @@
 # - configHook installs with --ignore-scripts, so bcrypt's native addon is not
 #   compiled during install; we `pnpm rebuild bcrypt` explicitly (node-gyp, offline
 #   via npm_config_nodedir). sharp/esbuild/msgpackr-extract ship prebuilt binaries.
-# - MUST use pnpm 11.10.0 (the version in package.json's packageManager field):
-#   nixpkgs' pnpm 10.28 cannot reconcile the pnpm-11-written `patchedDependencies`
-#   entry (@react-pdf/textkit) against the v9.0 lockfile and aborts with
-#   ERR_PNPM_LOCKFILE_CONFIG_MISMATCH. We build 11.10.0 from the same generic
-#   builder and drive both the deps FOD and the config hook with it.
+# - MUST track package.json's `packageManager` pnpm version EXACTLY, and it is
+#   load-bearing in both directions. Too old: nixpkgs' pnpm 10.28 cannot reconcile
+#   the pnpm-11-written `patchedDependencies` entry (@react-pdf/textkit) against
+#   the v9.0 lockfile and aborts with ERR_PNPM_LOCKFILE_CONFIG_MISMATCH. Merely
+#   MISMATCHED: pnpm sees a `packageManager` it is not, and auto-switches — it
+#   downloads that pnpm into the sandbox and re-execs it, which dies with
+#   "node: not found" because the fetched launcher has no Nix node on PATH. The
+#   bin/pnpm wrapper below swallows `pnpm config set manage-package-manager-versions
+#   false` (pnpm 11 rejects it in global scope), so that guard is NOT disabled and
+#   the auto-switch is live. 5.2.5 moved the pin 11.10.0 → 11.18.0; a bump that
+#   changes it and leaves this alone builds nowhere. We build the pinned version
+#   from the same generic builder and drive both the deps FOD and the config hook
+#   with it.
 {
   lib,
   stdenv,
@@ -39,15 +47,15 @@
 }:
 
 let
-  # pnpm 11.10.0 (matches the repo's packageManager pin + lockfile). Reuse the
+  # pnpm, matching the repo's packageManager pin + lockfile. Reuse the
   # nixpkgs pnpm derivation, swap the npm tarball. Relax preConfigure: pnpm 11
   # dropped the bundled `dist/reflink.*node` the base rule `rm -r`s (would error
   # on the missing glob), while `dist/vendor` (Windows fastlist blobs) still exists.
   pnpm_11 = pnpm.overrideAttrs (_: rec {
-    version = "11.10.0";
+    version = "11.18.0"; # == package.json packageManager; see the header note
     src = fetchurl {
       url = "https://registry.npmjs.org/pnpm/-/pnpm-${version}.tgz";
-      hash = "sha256-YgtmBepPYvxWptCphzP0eQcdAyHgPkhrUix+mnRhdDE=";
+      hash = "sha256-KcNcqNKih5iP3uPg824H2bk3g/VntXm3/Vt5ikVj3YE=";
     };
     preConfigure = "rm -rf dist/reflink.*node dist/vendor";
     # Two pnpm-11-vs-nixpkgs-pnpm-fetcher incompatibilities, both fixed by a thin
@@ -57,8 +65,8 @@ let
     #   2. The nixpkgs fetcher + configHook issue `pnpm config set
     #      manage-package-manager-versions false` in GLOBAL scope, which pnpm 11
     #      rejects (ERR_PNPM_CONFIG_SET_UNSUPPORTED_YAML_CONFIG_KEY — the key moved
-    #      to workspace scope). We already run pnpm 11 (== packageManager pin), so
-    #      that auto-switch guard is moot; swallow just that one invocation.
+    #      to workspace scope). Swallow just that one invocation — which leaves the
+    #      auto-switch ENABLED, hence the version-match requirement above.
     # exec the .mjs via an explicit node so we don't depend on its shebang/PATH.
     installPhase = ''
       runHook preInstall
@@ -88,11 +96,33 @@ stdenv.mkDerivation (finalAttrs: {
     hash = "sha256-TslwG4PQ31A7r5K8TGa2/5EgQ9cdgkjS17238twyVvM=";
   };
 
+  # PER-SYSTEM, and it must stay that way. fetchPnpmDeps runs `pnpm install
+  # --force`, which nixpkgs documents as fetching "all dependencies including ones
+  # that aren't meant for our host platform" — and up to pnpm 11.10.0 that did hold:
+  # both arches landed on one store path. It stopped holding at 11.18.0, which
+  # prunes the store it materialises to the host platform, so the two now differ:
+  #
+  #   x86_64-linux   sha256-53wt6kbXJYZC/hJpgx8FYkMxalZ///NxcV2e+/1I7KM=
+  #   aarch64-linux  sha256-SBoBTaXlEraAJb6LsJUlfexKPMJ7zfMOCaigvajSb6k=
+  #
+  # A single hash here builds on whichever arch computed it and fails everywhere
+  # else — the airtrail-nix defect. Renovate recomputes on x86_64 only, so on a
+  # version bump the aarch64 entry needs computing by hand ON aarch64:
+  #   nix build --impure --expr 'let f = builtins.getFlake "path:."; pkgs = import
+  #     <the consumer flake>.inputs.nixpkgs { system = "aarch64-linux"; };
+  #     in (pkgs.callPackage (f + "/package.nix") {}).pnpmDeps'
+  # and read the `got:` from the mismatch. Compute it against the CONSUMER's pinned
+  # nixpkgs, not this flake's nixos-unstable — the fetcher differs between them.
   pnpmDeps = fetchPnpmDeps {
     inherit (finalAttrs) pname version src;
     pnpm = pnpm_11;
     fetcherVersion = 3;
-    hash = "sha256-PKmM5Ulv9ev/AzvcASt6HRnxd3GjsqRTXwhCtuKFUCA=";
+    hash =
+      {
+        x86_64-linux = "sha256-53wt6kbXJYZC/hJpgx8FYkMxalZ///NxcV2e+/1I7KM=";
+        aarch64-linux = "sha256-SBoBTaXlEraAJb6LsJUlfexKPMJ7zfMOCaigvajSb6k=";
+      }
+      .${stdenv.hostPlatform.system};
   };
 
   # Base-path (URL sub-path) support. Rewrites the ~13 client/server sites that
