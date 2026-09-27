@@ -116,7 +116,7 @@ stdenv.mkDerivation (finalAttrs: {
     hash =
       {
         x86_64-linux = "sha256-53wt6kbXJYZC/hJpgx8FYkMxalZ///NxcV2e+/1I7KM=";
-        aarch64-linux = "sha256-JmzWtZRUFZ16ZF9SKvorP5hz8Xjr5PEBoCqBJq0R0zw=";
+        aarch64-linux = "sha256-SBoBTaXlEraAJb6LsJUlfexKPMJ7zfMOCaigvajSb6k=";
       }
       .${stdenv.hostPlatform.system};
   };
