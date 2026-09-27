@@ -103,9 +103,11 @@ stdenv.mkDerivation (finalAttrs: {
   # prunes the store it materialises to the host platform, so the two now differ.
   #
   # A single hash here builds on whichever arch computed it and fails everywhere
-  # else. renovate-hashes-arm.yml fills the aarch64 slot against the CONSUMER's
-  # nixpkgs pin (nic-os), not this flake's unstable: the fetcher differs between
-  # them, and so does the hash.
+  # else. Renovate fills only the x86_64 slot; compute aarch64 by hand ON THE PI:
+  #   NIXPKGS_REV=<nic-os's nixpkgs rev> bash ci/renovate-update.sh
+  # Not in CI: a GitHub arm64 runner gets a different hash than the Pi even with
+  # the same nixpkgs (5.2.5: JmzWtZRU… vs SBoBTaXl…), and this flake's own
+  # nixos-unstable a third one (PKmM5Ulv…).
   pnpmDeps = fetchPnpmDeps {
     inherit (finalAttrs) version src;
     # fetchPnpmDeps names the FOD from pname alone; without the version a stale
