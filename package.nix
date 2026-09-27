@@ -100,21 +100,17 @@ stdenv.mkDerivation (finalAttrs: {
   # --force`, which nixpkgs documents as fetching "all dependencies including ones
   # that aren't meant for our host platform" — and up to pnpm 11.10.0 that did hold:
   # both arches landed on one store path. It stopped holding at 11.18.0, which
-  # prunes the store it materialises to the host platform, so the two now differ:
-  #
-  #   x86_64-linux   sha256-53wt6kbXJYZC/hJpgx8FYkMxalZ///NxcV2e+/1I7KM=
-  #   aarch64-linux  sha256-SBoBTaXlEraAJb6LsJUlfexKPMJ7zfMOCaigvajSb6k=
+  # prunes the store it materialises to the host platform, so the two now differ.
   #
   # A single hash here builds on whichever arch computed it and fails everywhere
-  # else — the airtrail-nix defect. Renovate recomputes on x86_64 only, so on a
-  # version bump the aarch64 entry needs computing by hand ON aarch64:
-  #   nix build --impure --expr 'let f = builtins.getFlake "path:."; pkgs = import
-  #     <the consumer flake>.inputs.nixpkgs { system = "aarch64-linux"; };
-  #     in (pkgs.callPackage (f + "/package.nix") {}).pnpmDeps'
-  # and read the `got:` from the mismatch. Compute it against the CONSUMER's pinned
-  # nixpkgs, not this flake's nixos-unstable — the fetcher differs between them.
+  # else. renovate-hashes-arm.yml fills the aarch64 slot against the CONSUMER's
+  # nixpkgs pin (nic-os), not this flake's unstable: the fetcher differs between
+  # them, and so does the hash.
   pnpmDeps = fetchPnpmDeps {
-    inherit (finalAttrs) pname version src;
+    inherit (finalAttrs) version src;
+    # fetchPnpmDeps names the FOD from pname alone; without the version a stale
+    # hash silently reuses the previous release's deps from the store.
+    pname = "${finalAttrs.pname}-${finalAttrs.version}";
     pnpm = pnpm_11;
     fetcherVersion = 3;
     hash =
