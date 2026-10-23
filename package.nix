@@ -107,7 +107,8 @@ stdenv.mkDerivation (finalAttrs: {
   #   NIXPKGS_REV=<nic-os's nixpkgs rev> bash ci/renovate-update.sh
   # Not in CI: a GitHub arm64 runner gets a different hash than the Pi even with
   # the same nixpkgs (5.2.5: JmzWtZRU… vs SBoBTaXl…), and this flake's own
-  # nixos-unstable a third one (PKmM5Ulv…).
+  # nixos-unstable a third one (PKmM5Ulv…). Under nic-os's nixos-26.05 pin
+  # (da6dc0e) the Pi and nic-os's arm64 CI both get PKmM5Ulv….
   pnpmDeps = fetchPnpmDeps {
     inherit (finalAttrs) version src;
     # fetchPnpmDeps names the FOD from pname alone; without the version a stale
@@ -118,7 +119,7 @@ stdenv.mkDerivation (finalAttrs: {
     hash =
       {
         x86_64-linux = "sha256-53wt6kbXJYZC/hJpgx8FYkMxalZ///NxcV2e+/1I7KM=";
-        aarch64-linux = "sha256-SBoBTaXlEraAJb6LsJUlfexKPMJ7zfMOCaigvajSb6k=";
+        aarch64-linux = "sha256-PKmM5Ulv9ev/AzvcASt6HRnxd3GjsqRTXwhCtuKFUCA=";
       }
       .${stdenv.hostPlatform.system};
   };
