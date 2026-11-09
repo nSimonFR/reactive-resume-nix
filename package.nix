@@ -87,13 +87,13 @@ let
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "reactive-resume";
-  version = "5.2.5";
+  version = "6.1.0";
 
   src = fetchFromGitHub {
     owner = "amruthpillai";
     repo = "reactive-resume";
     rev = "v${finalAttrs.version}";
-    hash = "sha256-TslwG4PQ31A7r5K8TGa2/5EgQ9cdgkjS17238twyVvM=";
+    hash = "sha256-W+/MUH6ld57vVm830V6Y0klWxLW+HaFiXs6Nyd8ft6U=";
   };
 
   # PER-SYSTEM, and it must stay that way. fetchPnpmDeps runs `pnpm install
@@ -118,7 +118,7 @@ stdenv.mkDerivation (finalAttrs: {
     fetcherVersion = 3;
     hash =
       {
-        x86_64-linux = "sha256-53wt6kbXJYZC/hJpgx8FYkMxalZ///NxcV2e+/1I7KM=";
+        x86_64-linux = "sha256-wcvK3HZkhkfhRxBkYbg8azPiappTabPdFOosbb4/mXw=";
         aarch64-linux = "sha256-PKmM5Ulv9ev/AzvcASt6HRnxd3GjsqRTXwhCtuKFUCA=";
       }
       .${stdenv.hostPlatform.system};
