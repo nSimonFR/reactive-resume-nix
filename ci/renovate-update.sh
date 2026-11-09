@@ -37,9 +37,10 @@ fi
 
 # 2. pnpmDeps FOD — per-system, so only this system's slot is rewritten: the two
 # slots can hold the same stale value, and a value-based sed would clobber both.
-# The hash also depends on the nixpkgs the fetcher comes from: nic-os builds with
-# its own pin (follows), whose aarch64 hash differs from this flake's unstable.
-# NIXPKGS_REV computes against that pin instead.
+# The fetcher comes from this flake's own `nixpkgs-pnpm` input, which consumers
+# do not override, so the hash is the same for every consumer. NIXPKGS_REV
+# (override of `nixpkgs`, the runtime set) no longer affects it; kept for one-off
+# experiments.
 system=$(nix eval --impure --raw --expr 'builtins.currentSystem')
 echo ">> system     = $system"
 override=()

@@ -1,43 +1,37 @@
-# Reactive Resume (rxresu.me) v5 — native build from source.
+# Reactive Resume (rxresu.me) v6 — native build from source.
 #
-# v5 is a pnpm@11 + turbo monorepo (apps/{web,server} + 16 workspace packages).
-# The upstream install path is Docker-only; this builds it the Nix way:
-#   1. fetchPnpmDeps — fixed-output derivation fetching the whole pnpm store.
+# v6 is a pnpm@12 + turbo monorepo (apps/{web,server,mobile} + ~17 workspace
+# packages). The upstream install path is Docker-only; this builds it the Nix way:
+#   1. fetchPnpmDeps — fixed-output derivation fetching the pnpm store, limited to
+#      the projects the web + server build needs (pnpmWorkspaces; the Expo mobile
+#      app and its React Native tree are left out, as the Dockerfile's
+#      `turbo prune web server` does).
 #   2. pnpmConfigHook — offline `pnpm install --frozen-lockfile` from that store.
-#   3. turbo build --filter=web --filter=server — Vite SPA (apps/web/dist) +
-#      tsdown server bundle (apps/server/dist/index.mjs, serves the SPA statically).
+#   3. turbo build --filter=web --filter=server — Vite SPA (apps/web/dist), the
+#      prerendered marketing pages (apps/web/dist-prerender) and the tsdown server
+#      bundle (apps/server/dist/index.mjs, serves the SPA statically).
 #
 # Notes:
-# - Drizzle ORM + raw-SQL migrations (migrations/), no Prisma engine / codegen.
-#   The server self-applies migrations on boot (apps/server/src/startup/checks.ts),
-#   locating migrations/ by walking parent dirs from the server module — so it MUST
-#   sit at the package root (share/reactive-resume/migrations).
-# - configHook installs with --ignore-scripts, so bcrypt's native addon is not
-#   compiled during install; we `pnpm rebuild bcrypt` explicitly (node-gyp, offline
-#   via npm_config_nodedir). sharp/esbuild/msgpackr-extract ship prebuilt binaries.
-# - MUST track package.json's `packageManager` pnpm version EXACTLY, and it is
-#   load-bearing in both directions. Too old: nixpkgs' pnpm 10.28 cannot reconcile
-#   the pnpm-11-written `patchedDependencies` entry (@react-pdf/textkit) against
-#   the v9.0 lockfile and aborts with ERR_PNPM_LOCKFILE_CONFIG_MISMATCH. Merely
-#   MISMATCHED: pnpm sees a `packageManager` it is not, and auto-switches — it
-#   downloads that pnpm into the sandbox and re-execs it, which dies with
-#   "node: not found" because the fetched launcher has no Nix node on PATH. The
-#   bin/pnpm wrapper below swallows `pnpm config set manage-package-manager-versions
-#   false` (pnpm 11 rejects it in global scope), so that guard is NOT disabled and
-#   the auto-switch is live. 5.2.5 moved the pin 11.10.0 → 11.18.0; a bump that
-#   changes it and leaves this alone builds nowhere. We build the pinned version
-#   from the same generic builder and drive both the deps FOD and the config hook
-#   with it.
+# - Drizzle ORM + raw-SQL migrations (migrations/). The server self-applies them on
+#   boot, locating migrations/ by walking parent dirs from the server module — so it
+#   MUST sit at the package root (share/reactive-resume/migrations).
+# - pnpm 12 is a native (Rust) binary; ./pnpm.nix packages the exact version
+#   package.json `packageManager` pins. fetchPnpmDeps / pnpmConfigHook come from
+#   the flake's own `nixpkgs-pnpm` input (passed in as `pnpmPkgs`), because only a
+#   recent nixpkgs knows pnpm >= 11 (fetcherVersion 5, the v11 SQLite store index,
+#   `pnpm_config_pm_on_fail=ignore` instead of the global config key pnpm 11+
+#   rejects). That also makes the pnpmDeps hash independent of the consumer's
+#   nixpkgs.
+# - v6 hashes passwords with bcryptjs (pure JS): no node-gyp step any more.
+# - The server renders PDFs in-process (Forme, @formepdf/core — WASM): no
+#   Chromium/Gotenberg/printer service.
 {
   lib,
   stdenv,
   fetchFromGitHub,
-  fetchurl,
   nodejs_24,
-  pnpm,
-  pnpmConfigHook,
-  fetchPnpmDeps,
-  python3,
+  autoPatchelfHook,
+  pnpmPkgs,
   # Build the SPA under a URL sub-path (Vite `base`, router basepath, and the
   # client/server absolute-URL builders all derive from this — see
   # patches/base-path-support.patch). "/" = served at the web root (default);
@@ -47,138 +41,80 @@
 }:
 
 let
-  # pnpm, matching the repo's packageManager pin + lockfile. Reuse the
-  # nixpkgs pnpm derivation, swap the npm tarball. Relax preConfigure: pnpm 11
-  # dropped the bundled `dist/reflink.*node` the base rule `rm -r`s (would error
-  # on the missing glob), while `dist/vendor` (Windows fastlist blobs) still exists.
-  pnpm_11 = pnpm.overrideAttrs (_: rec {
-    version = "11.18.0"; # == package.json packageManager; see the header note
-    src = fetchurl {
-      url = "https://registry.npmjs.org/pnpm/-/pnpm-${version}.tgz";
-      hash = "sha256-KcNcqNKih5iP3uPg824H2bk3g/VntXm3/Vt5ikVj3YE=";
-    };
-    preConfigure = "rm -rf dist/reflink.*node dist/vendor";
-    # Two pnpm-11-vs-nixpkgs-pnpm-fetcher incompatibilities, both fixed by a thin
-    # bin/pnpm wrapper:
-    #   1. pnpm 11 renamed the entrypoints bin/pnpm.cjs → bin/pnpm.mjs (the base
-    #      installPhase symlinks the now-missing .cjs).
-    #   2. The nixpkgs fetcher + configHook issue `pnpm config set
-    #      manage-package-manager-versions false` in GLOBAL scope, which pnpm 11
-    #      rejects (ERR_PNPM_CONFIG_SET_UNSUPPORTED_YAML_CONFIG_KEY — the key moved
-    #      to workspace scope). Swallow just that one invocation — which leaves the
-    #      auto-switch ENABLED, hence the version-match requirement above.
-    # exec the .mjs via an explicit node so we don't depend on its shebang/PATH.
-    installPhase = ''
-      runHook preInstall
-      install -d $out/{bin,libexec}
-      cp -R . $out/libexec/pnpm
-      chmod +x $out/libexec/pnpm/bin/*.mjs
-      cat > $out/bin/pnpm <<EOF
-      #!/bin/sh
-      if [ "\$1" = config ] && [ "\$2" = set ] && [ "\$3" = manage-package-manager-versions ]; then exit 0; fi
-      exec ${nodejs_24}/bin/node $out/libexec/pnpm/bin/pnpm.mjs "\$@"
-      EOF
-      chmod +x $out/bin/pnpm
-      ln -s $out/libexec/pnpm/bin/pnpx.mjs $out/bin/pnpx
-      runHook postInstall
-    '';
-    postInstall = "";
-  });
+  pnpm_12 = pnpmPkgs.callPackage ./pnpm.nix { };
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "reactive-resume";
-  version = "5.2.5";
+  version = "6.1.0";
 
   src = fetchFromGitHub {
     owner = "amruthpillai";
     repo = "reactive-resume";
     rev = "v${finalAttrs.version}";
-    hash = "sha256-TslwG4PQ31A7r5K8TGa2/5EgQ9cdgkjS17238twyVvM=";
+    hash = "sha256-W+/MUH6ld57vVm830V6Y0klWxLW+HaFiXs6Nyd8ft6U=";
   };
 
-  # PER-SYSTEM, and it must stay that way. fetchPnpmDeps runs `pnpm install
-  # --force`, which nixpkgs documents as fetching "all dependencies including ones
-  # that aren't meant for our host platform" — and up to pnpm 11.10.0 that did hold:
-  # both arches landed on one store path. It stopped holding at 11.18.0, which
-  # prunes the store it materialises to the host platform, so the two now differ.
-  #
-  # A single hash here builds on whichever arch computed it and fails everywhere
-  # else. Renovate fills only the x86_64 slot; compute aarch64 by hand ON THE PI:
-  #   NIXPKGS_REV=<nic-os's nixpkgs rev> bash ci/renovate-update.sh
-  # Not in CI: a GitHub arm64 runner gets a different hash than the Pi even with
-  # the same nixpkgs (5.2.5: JmzWtZRU… vs SBoBTaXl…), and this flake's own
-  # nixos-unstable a third one (PKmM5Ulv…). Under nic-os's nixos-26.05 pin
-  # (da6dc0e) the Pi and nic-os's arm64 CI both get PKmM5Ulv….
-  pnpmDeps = fetchPnpmDeps {
-    inherit (finalAttrs) version src;
+  # Only these projects (and their workspace deps, the trailing `...`) are
+  # installed, in the FOD and again by pnpmConfigHook. The root project carries
+  # turbo + vite-plus; tooling runs web's `capture:build` prebuild step.
+  pnpmWorkspaces = [
+    "reactive-resume"
+    "web..."
+    "server..."
+    "@reactive-resume/tooling..."
+  ];
+
+  # PER-SYSTEM. Since pnpm 11.18 the store pnpm materialises is pruned to the host
+  # platform's native bindings, so the two arches hash differently. Renovate fills
+  # only the x86_64 slot; compute aarch64 by hand ON THE PI:
+  #   bash ci/renovate-update.sh
+  # The fetcher comes from this flake's `nixpkgs-pnpm` input, which consumers do not
+  # override, so the hash no longer depends on the consumer's nixpkgs (it did in v5,
+  # where nic-os's pin and this flake's unstable produced different hashes).
+  pnpmDeps = pnpmPkgs.fetchPnpmDeps {
+    inherit (finalAttrs) version src pnpmWorkspaces;
     # fetchPnpmDeps names the FOD from pname alone; without the version a stale
     # hash silently reuses the previous release's deps from the store.
     pname = "${finalAttrs.pname}-${finalAttrs.version}";
-    pnpm = pnpm_11;
-    fetcherVersion = 3;
+    pnpm = pnpm_12;
+    fetcherVersion = 5;
     hash =
       {
-        x86_64-linux = "sha256-53wt6kbXJYZC/hJpgx8FYkMxalZ///NxcV2e+/1I7KM=";
-        aarch64-linux = "sha256-PKmM5Ulv9ev/AzvcASt6HRnxd3GjsqRTXwhCtuKFUCA=";
+        x86_64-linux = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        aarch64-linux = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
       }
       .${stdenv.hostPlatform.system};
   };
 
-  # Base-path (URL sub-path) support. Rewrites the ~13 client/server sites that
-  # hardcode a root origin (Vite `base`, TanStack Router basepath, the oRPC +
-  # better-auth client base, public-share/avatar URLs, and the server's
-  # APP_URL-joined PDF/storage/login URLs) to derive from the base path. The
-  # patch does not touch package.json / pnpm-lock.yaml, so pnpmDeps is unchanged.
-  # It is a no-op at APP_BASE_PATH=/ (the default), so the default build is the
-  # stock root-served app.
+  # Base-path (URL sub-path) support, ported to v6. v6 has no base-path option
+  # upstream. The patch sets Vite `base` + the router basepath, re-roots the oRPC /
+  # Better Auth / MCP / upload / share URLs the client builds from
+  # window.location.origin, and makes the server join APP_URL (which carries the
+  # sub-path) instead of resolving root-absolute paths against it. The ~40
+  # root-absolute public-file literals (`/templates/…`, `/logo/…`, …) are not
+  # hunked one by one: a small Vite transform in vite.config.ts prefixes every
+  # top-level entry of apps/web/public/, so new assets upstream need no re-anchor.
+  # Better Auth keeps routing at the origin root (the proxy strips the prefix).
+  # Applied only for a sub-path build; it does not touch package.json /
+  # pnpm-lock.yaml, so pnpmDeps is shared by both builds.
   #
-  # 5.2.3 dropped one hunk: apps/server/src/static/uploads.ts used to send
-  # `Access-Control-Allow-Origin: env.APP_URL`, which is not a valid origin once
-  # APP_URL carries a sub-path — the hunk narrowed it to `new URL(…).origin`.
-  # Upstream deleted that header outright in 5.2.3, so the hunk is obsolete, not
-  # merely misplaced: there is nothing left to narrow, and uploads are served
-  # same-origin anyway. Re-anchoring it would have re-introduced a header upstream
-  # deliberately removed.
-  #
-  # 5.2.5 needed four hunks re-anchored — same intent, code merely reshaped:
-  # `authClient` stopped being built by a `getAuthClient()` factory and became a
-  # top-level const; `dock.tsx` and `sharing.tsx` collapsed their `publicUrl`
-  # useMemos into one-line ternaries; `orpc/client.ts` only drifted by line number.
-  # It also GREW three: 5.2.5 moved the icon / apple-touch-icon / manifest <link>s
-  # (and the home page's video preload) out of apps/web/index.html — where Vite
-  # re-roots root-absolute hrefs against `base` for free — into TanStack Router
-  # `head()` blocks, where they are runtime strings Vite never touches. Left alone
-  # they 404 under a sub-path, taking the PWA install with them. `seo.ts` is the
-  # third: getCanonicalRootUrl pinned `url.pathname = "/"`, so the canonical URL
-  # and the og:image `${base}templates/jpg/…` both pointed at the domain root.
-  # Two more public assets were never covered at any version and surfaced in the
-  # same sweep: the home hero <video>'s poster/src, and the new-resume dialog's
-  # 15 template thumbnails (prefixed in gallery.tsx at the point of use, not in
-  # template/data.ts, so data.test.ts's `toMatch(/^\/templates\//)` stays honest).
-  patches = [ ./patches/base-path-support.patch ];
+  # Dropped since v5: the error/not-found screen I18nProvider hunks (upstream now
+  # wraps ErrorScreen itself) and the gallery thumbnail / home video / __root
+  # icon hunks (covered by the Vite transform or moved back into index.html).
+  patches = lib.optionals (appBasePath != "/") [ ./patches/base-path-support.patch ];
 
   # oRPC request batching (BatchLinkPlugin) embeds each sub-request's ABSOLUTE
-  # URL — including the base path — in the batch POST body. Behind a reverse
-  # proxy that strips the base-path prefix before forwarding, the backend (RPC
-  # handler mounted at /api/rpc) cannot route those inner /<base>/api/rpc/...
-  # paths, so every batched query fails with 404 "No procedure matched". The
-  # symptom is a dashboard whose initial (batched) draw is empty while single
-  # requests (e.g. a sort/filter change) work. Disable batching for sub-path
-  # builds so each query is an individual request whose outer path the proxy
-  # strips correctly. No-op at APP_BASE_PATH=/ (batching left intact for the
-  # stock root-served app, where the embedded URLs resolve fine).
+  # URL — base path included — in the batch body. The proxy strips the prefix
+  # from the outer request only, so the inner /<base>/api/rpc/... paths match no
+  # procedure (404, empty dashboard). Disable batching for sub-path builds.
   #
-  # The PWA manifest is a static file under apps/web/public/, which Vite copies
-  # VERBATIM — the `base` rewrite that re-roots index.html's root-absolute hrefs
-  # (favicon, apple-touch-icon, the manifest link itself) never reaches its
-  # contents. So `id`/`start_url`/`scope` stay pinned to the domain root: an
-  # installed PWA is scoped to, and launches at, whatever else is hosted there.
-  # Re-root them on appBasePath (identity at the default "/"). The icon `src`s
-  # are already relative, so they resolve against the manifest's own URL.
+  # The PWA manifest is a static public/ file Vite copies verbatim, so its
+  # `id`/`start_url`/`scope` stay pinned to the domain root: re-root them on
+  # appBasePath (identity at "/").
   postPatch = ''
     substituteInPlace apps/web/public/manifest.webmanifest \
       --replace-fail '"id": "/?source=pwa"' '"id": "${appBasePath}?source=pwa"' \
-      --replace-fail '"start_url": "/?source=pwa"' '"start_url": "${appBasePath}?source=pwa"' \
+      --replace-fail '"start_url": "/dashboard"' '"start_url": "${appBasePath}dashboard"' \
       --replace-fail '"scope": "/"' '"scope": "${appBasePath}"'
   '' + lib.optionalString (appBasePath != "/") ''
     substituteInPlace apps/web/src/libs/orpc/client.ts \
@@ -188,16 +124,27 @@ stdenv.mkDerivation (finalAttrs: {
 
   nativeBuildInputs = [
     nodejs_24
-    pnpm_11
-    pnpmConfigHook # uses pnpm_11 (only pnpm on PATH); reads $pnpmDeps
-    python3 # node-gyp for bcrypt
+    pnpm_12
+    pnpmPkgs.pnpmConfigHook # reads $pnpmDeps
+    autoPatchelfHook
   ];
+
+  # Prebuilt ELF executables shipped in npm packages (esbuild, turbo) expect an
+  # FHS loader the sandbox lacks; patch them before anything runs them. Only
+  # executables: the shared-object .node addons are loaded by node and fine as-is.
+  # (preBuild, not postConfigure: the implicit postConfigure runs BEFORE
+  # pnpmConfigHook has installed node_modules.)
+  dontAutoPatchelf = true;
+  buildInputs = [ stdenv.cc.cc.lib ];
+  preBuild = ''
+    readarray -d "" elfs < <(find node_modules/.pnpm -type f -perm -0100 \
+      \( -path '*/@esbuild+linux-*/bin/esbuild' -o -path '*/turbo-linux-*/bin/turbo' \) -print0)
+    for f in "''${elfs[@]}"; do autoPatchelf "$f"; done
+  '';
 
   env = {
     TURBO_TELEMETRY_DISABLED = "1";
     CI = "1";
-    # node-gyp builds bcrypt against these headers, fully offline.
-    npm_config_nodedir = "${nodejs_24}";
     # Vite reads this in apps/web/vite.config.ts (`base`) at build time; the
     # patched client sources derive their router basepath + fetch bases from it.
     APP_BASE_PATH = appBasePath;
@@ -206,16 +153,15 @@ stdenv.mkDerivation (finalAttrs: {
   buildPhase = ''
     runHook preBuild
 
-    # bcrypt's native addon is skipped by configHook (--ignore-scripts); compile
-    # it now against the Nix node headers.
-    pnpm rebuild bcrypt
-
     # Build only the web SPA + server bundle; turbo pulls in the workspace
-    # packages they depend on transitively (keeps peak RAM down vs. all 16).
+    # packages they depend on transitively.
     # --env-mode=loose: turbo 2.x strips undeclared env vars from tasks by
     # default (strict mode), which would hide APP_BASE_PATH from `vite build`
     # (→ base always "/"). Loose passes the full build env through to the tasks.
     pnpm exec turbo run build --filter=web --filter=server --env-mode=loose
+
+    # Brotli copies the server sends to browsers that accept br (as the Dockerfile).
+    node tooling/docker/precompress.mjs apps/web/dist
 
     runHook postBuild
   '';
@@ -225,21 +171,19 @@ stdenv.mkDerivation (finalAttrs: {
 
     # Ship the built workspace tree wholesale: the tsdown server bundle
     # externalises npm deps, so node_modules (pnpm symlink farm, relative links
-    # resolve within $out) must travel with it, alongside the web dist and the
-    # migrations/ folder the boot-time migrator walks up to find.
-    # Copy every workspace member (apps/*, packages/*, tooling per
-    # pnpm-workspace.yaml) so the @reactive-resume/* symlinks in node_modules/.pnpm
-    # all resolve — omitting `tooling` leaves one dangling symlink that trips the
-    # stdenv noBrokenSymlinks check.
-    mkdir -p $out/share/reactive-resume
+    # resolve within $out) must travel with it, alongside the web dist (+ the
+    # prerendered pages) and the migrations/ folder the boot-time migrator walks
+    # up to find. apps/mobile is not installed (pnpmWorkspaces), so it stays out.
+    mkdir -p $out/share/reactive-resume/apps
     cp -a \
       node_modules \
-      apps \
       packages \
       tooling \
+      plugins \
       migrations \
       package.json pnpm-lock.yaml pnpm-workspace.yaml \
       $out/share/reactive-resume/
+    cp -a apps/web apps/server $out/share/reactive-resume/apps/
 
     mkdir -p $out/bin
     cat > $out/bin/reactive-resume <<EOF
@@ -248,18 +192,27 @@ stdenv.mkDerivation (finalAttrs: {
     EOF
     chmod +x $out/bin/reactive-resume
 
+    # One-time v5 → v6 conversion of style-editor styles (docs: upgrading-to-v6).
+    cat > $out/bin/reactive-resume-migrate-legacy-styles <<EOF
+    #!${stdenv.shell}
+    exec ${nodejs_24}/bin/node $out/share/reactive-resume/apps/server/dist/migrate-legacy-styles.mjs "\$@"
+    EOF
+    chmod +x $out/bin/reactive-resume-migrate-legacy-styles
+
     runHook postInstall
   '';
 
-  # node_modules is already built for this platform; nothing to strip/patch that
-  # the pnpm store hasn't handled. Avoid fixup mangling the bcrypt .node.
+  # node_modules is already built for this platform; avoid fixup mangling the
+  # prebuilt native addons.
   dontStrip = true;
+
+  passthru.pnpm = pnpm_12;
 
   meta = {
     description = "A free and open-source resume builder (self-hosted)";
     homepage = "https://rxresu.me";
     license = lib.licenses.mit;
     mainProgram = "reactive-resume";
-    platforms = lib.platforms.linux;
+    platforms = [ "x86_64-linux" "aarch64-linux" ];
   };
 })
