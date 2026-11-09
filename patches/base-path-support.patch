@@ -1,246 +1,147 @@
-diff -ruN rr525-orig/apps/server/src/http/auth.ts rr525/apps/server/src/http/auth.ts
---- a/apps/server/src/http/auth.ts	2026-08-16 12:45:25.581987614 +0200
-+++ b/apps/server/src/http/auth.ts	2026-08-16 12:42:42.477002289 +0200
-@@ -198,7 +198,7 @@
- 		});
- 	}
+diff --git a/apps/server/src/http/auth.ts b/apps/server/src/http/auth.ts
+index 394fc355e..2a6e89525 100644
+--- a/apps/server/src/http/auth.ts
++++ b/apps/server/src/http/auth.ts
+@@ -238,7 +238,7 @@ async function resumeOAuth(request: Request) {
  
--	const loginUrl = new URL("/auth/login", env.APP_URL);
-+	const loginUrl = new URL(env.APP_URL + "/auth/login");
- 	const oauthParams = new URLSearchParams();
- 	for (const [key, value] of url.searchParams) {
- 		if (!oauthCallbackPassthroughExcludedParams.has(key)) {
-diff -ruN rr525-orig/apps/web/src/components/layout/error-screen.tsx rr525/apps/web/src/components/layout/error-screen.tsx
---- a/apps/web/src/components/layout/error-screen.tsx	2026-08-16 12:45:25.736235535 +0200
-+++ b/apps/web/src/components/layout/error-screen.tsx	2026-08-16 12:42:42.479914574 +0200
-@@ -1,3 +1,5 @@
-+import { i18n } from "@lingui/core";
-+import { I18nProvider } from "@lingui/react";
- import type { ErrorComponentProps } from "@tanstack/react-router";
- import { Trans } from "@lingui/react/macro";
- import { ArrowClockwiseIcon, HouseIcon, WarningIcon } from "@phosphor-icons/react";
-@@ -8,30 +10,32 @@
- 
- export function ErrorScreen({ reset }: ErrorComponentProps) {
- 	return (
--		<div className="mx-auto flex h-svh max-w-md flex-col items-center justify-center gap-y-4">
--			<BrandIcon variant="logo" className="size-12" />
--
--			<Alert>
--				<WarningIcon />
--				<AlertTitle>
--					<Trans>Something went wrong</Trans>
--				</AlertTitle>
--				<AlertDescription>
--					<Trans>An unexpected error stopped this page from loading. You can try again or head back.</Trans>
--				</AlertDescription>
--			</Alert>
--
--			<div className="flex items-center gap-x-2">
--				<Button onClick={reset}>
--					<ArrowClockwiseIcon />
--					<Trans>Try again</Trans>
--				</Button>
--
--				<Link to="/dashboard" className={buttonVariants({ variant: "secondary" })}>
--					<HouseIcon />
--					<Trans>Go to dashboard</Trans>
--				</Link>
-+		<I18nProvider i18n={i18n}>
-+					<div className="mx-auto flex h-svh max-w-md flex-col items-center justify-center gap-y-4">
-+				<BrandIcon variant="logo" className="size-12" />
-+	
-+				<Alert>
-+					<WarningIcon />
-+					<AlertTitle>
-+						<Trans>Something went wrong</Trans>
-+					</AlertTitle>
-+					<AlertDescription>
-+						<Trans>An unexpected error stopped this page from loading. You can try again or head back.</Trans>
-+					</AlertDescription>
-+				</Alert>
-+	
-+				<div className="flex items-center gap-x-2">
-+					<Button onClick={reset}>
-+						<ArrowClockwiseIcon />
-+						<Trans>Try again</Trans>
-+					</Button>
-+	
-+					<Link to="/dashboard" className={buttonVariants({ variant: "secondary" })}>
-+						<HouseIcon />
-+						<Trans>Go to dashboard</Trans>
-+					</Link>
-+				</div>
- 			</div>
--		</div>
-+		</I18nProvider>
- 	);
+ function redirectToOAuthLogin(url: URL, reauthenticate = false, headers = new Headers()) {
+ 	const prompt = new Set(url.searchParams.get("prompt")?.split(" ") ?? []);
+-	const loginUrl = new URL(prompt.has("create") ? "/auth/register" : "/auth/login", env.APP_URL);
++	const loginUrl = new URL(`${env.APP_URL.replace(/\/+$/, "")}${prompt.has("create") ? "/auth/register" : "/auth/login"}`);
+ 	if (reauthenticate) loginUrl.searchParams.set("reauthenticate", "true");
+ 	// A client's OpenID `ui_locales` (the mobile app sends its language) opens the sign-in pages in that language; the
+ 	// app keeps it, and a new account starts in it. Only a supported locale is passed on.
+diff --git a/apps/server/src/static/resume-card.ts b/apps/server/src/static/resume-card.ts
+index 67f5b0ef5..b7332ca7a 100644
+--- a/apps/server/src/static/resume-card.ts
++++ b/apps/server/src/static/resume-card.ts
+@@ -25,7 +25,7 @@ function readableAddress(username: string, slug: string, card: { isPrimary: bool
+ 	return `${new URL(env.APP_ALIAS_URL ?? env.APP_URL).host}${publicResumePath({ username, slug, isPrimary: card.isPrimary })}`;
  }
-diff -ruN rr525-orig/apps/web/src/components/layout/not-found-screen.tsx rr525/apps/web/src/components/layout/not-found-screen.tsx
---- a/apps/web/src/components/layout/not-found-screen.tsx	2026-08-16 12:45:25.737512676 +0200
-+++ b/apps/web/src/components/layout/not-found-screen.tsx	2026-08-16 12:42:42.480082020 +0200
-@@ -1,3 +1,5 @@
-+import { i18n } from "@lingui/core";
-+import { I18nProvider } from "@lingui/react";
- import { Trans } from "@lingui/react/macro";
- import { HouseIcon, MagnifyingGlassIcon, WarningIcon } from "@phosphor-icons/react";
- import { Link } from "@tanstack/react-router";
-@@ -7,30 +9,32 @@
  
- export function NotFoundScreen() {
- 	return (
--		<div className="mx-auto flex h-svh max-w-md flex-col items-center justify-center gap-y-4">
--			<BrandIcon variant="logo" className="size-12" />
--
--			<Alert>
--				<WarningIcon />
--				<AlertTitle>
--					<Trans>We couldn't find that page</Trans>
--				</AlertTitle>
--				<AlertDescription>
--					<Trans>The page you're looking for may have been moved or no longer exists.</Trans>
--				</AlertDescription>
--			</Alert>
--
--			<div className="flex items-center gap-x-2">
--				<Link to="/dashboard" className={buttonVariants()}>
--					<MagnifyingGlassIcon />
--					<Trans>Go to dashboard</Trans>
--				</Link>
--
--				<Link to="/" className={buttonVariants({ variant: "secondary" })}>
--					<HouseIcon />
--					<Trans>Go home</Trans>
--				</Link>
-+		<I18nProvider i18n={i18n}>
-+					<div className="mx-auto flex h-svh max-w-md flex-col items-center justify-center gap-y-4">
-+				<BrandIcon variant="logo" className="size-12" />
-+	
-+				<Alert>
-+					<WarningIcon />
-+					<AlertTitle>
-+						<Trans>We couldn't find that page</Trans>
-+					</AlertTitle>
-+					<AlertDescription>
-+						<Trans>The page you're looking for may have been moved or no longer exists.</Trans>
-+					</AlertDescription>
-+				</Alert>
-+	
-+				<div className="flex items-center gap-x-2">
-+					<Link to="/dashboard" className={buttonVariants()}>
-+						<MagnifyingGlassIcon />
-+						<Trans>Go to dashboard</Trans>
-+					</Link>
-+	
-+					<Link to="/" className={buttonVariants({ variant: "secondary" })}>
-+						<HouseIcon />
-+						<Trans>Go home</Trans>
-+					</Link>
-+				</div>
- 			</div>
--		</div>
-+		</I18nProvider>
- 	);
- }
-diff -ruN rr525-orig/apps/web/src/dialogs/resume/index.tsx rr525/apps/web/src/dialogs/resume/index.tsx
---- a/apps/web/src/dialogs/resume/index.tsx	2026-08-16 12:45:25.746899519 +0200
-+++ b/apps/web/src/dialogs/resume/index.tsx	2026-08-16 12:42:42.477389700 +0200
-@@ -344,7 +344,7 @@
- 	render: function ResumeFormRenderer({ form }) {
- 		const { data: session } = authClient.useSession();
+-const banner = () => Response.redirect(new URL("/opengraph/banner.jpg", env.APP_URL), 302);
++const banner = () => Response.redirect(`${env.APP_URL.replace(/\/+$/, "")}/opengraph/banner.jpg`, 302);
  
--		const slugPrefix = `${window.location.origin}/${session?.user.username ?? ""}/`;
-+		const slugPrefix = `${window.location.origin}${import.meta.env.BASE_URL}${session?.user.username ?? ""}/`;
+ /**
+  * `GET /cards/<username>/<slug>.png`: the web page's link preview, drawn in the resume's fonts and colour.
+diff --git a/apps/server/src/static/resume-page.ts b/apps/server/src/static/resume-page.ts
+index d0525eb86..09970de41 100644
+--- a/apps/server/src/static/resume-page.ts
++++ b/apps/server/src/static/resume-page.ts
+@@ -19,7 +19,9 @@ import { mistypedAppPath } from "@reactive-resume/utils/app-paths";
+ import { getPageLocale } from "./locale";
+ import { BASE_SECURITY_HEADERS, contentSecurityPolicy } from "./web";
  
- 		const onGenerateName = () => {
- 			form.setFieldValue("name", generateRandomName());
-diff -ruN rr525-orig/apps/web/src/dialogs/resume/template/gallery.tsx rr525/apps/web/src/dialogs/resume/template/gallery.tsx
---- a/apps/web/src/dialogs/resume/template/gallery.tsx	2026-08-16 12:45:25.753658876 +0200
-+++ b/apps/web/src/dialogs/resume/template/gallery.tsx	2026-08-16 12:49:48.812810863 +0200
-@@ -98,6 +98,8 @@
- };
+-const origin = () => new URL(env.APP_URL).origin;
++const origin = () => env.APP_URL.replace(/\/+$/, "");
++// The path APP_URL is served under (a sub-path install); redirects below stay inside it.
++const basePath = () => new URL(env.APP_URL).pathname.replace(/\/+$/, "");
  
- function TemplateCard({ id, data, metadata, isActive, onSelect }: TemplateCardProps) {
-+	const imageUrl = `${import.meta.env.BASE_URL}${metadata.imageUrl.replace(/^\//, "")}`;
-+
- 	return (
- 		<CometCard translateDepth={3} rotateDepth={6} glareOpacity={0}>
- 			<button
-@@ -108,8 +110,8 @@
- 					isActive && "ring-2 ring-ring ring-offset-4 ring-offset-background",
- 				)}
- 			>
--				<Suspense fallback={<img src={metadata.imageUrl} alt={metadata.name} className="size-full object-cover" />}>
--					<TemplateLivePreview data={data} template={id} fallbackSrc={metadata.imageUrl} alt={metadata.name} />
-+				<Suspense fallback={<img src={imageUrl} alt={metadata.name} className="size-full object-cover" />}>
-+					<TemplateLivePreview data={data} template={id} fallbackSrc={imageUrl} alt={metadata.name} />
- 				</Suspense>
- 			</button>
- 
-diff -ruN rr525-orig/apps/web/src/libs/auth/client.ts rr525/apps/web/src/libs/auth/client.ts
---- a/apps/web/src/libs/auth/client.ts	2026-08-16 12:45:25.788910656 +0200
-+++ b/apps/web/src/libs/auth/client.ts	2026-08-16 12:43:58.488581051 +0200
-@@ -14,6 +14,7 @@
- import { createAuthClient } from "better-auth/react";
- 
- export const authClient = createAuthClient({
-+	baseURL: typeof window === "undefined" ? undefined : window.location.origin + import.meta.env.BASE_URL + "api/auth",
- 	plugins: [
- 		dashClient(),
- 		adminClient(),
-diff -ruN rr525-orig/apps/web/src/libs/orpc/client.ts rr525/apps/web/src/libs/orpc/client.ts
---- a/apps/web/src/libs/orpc/client.ts	2026-08-16 12:45:25.790282224 +0200
-+++ b/apps/web/src/libs/orpc/client.ts	2026-08-16 12:43:58.488100824 +0200
-@@ -7,7 +7,7 @@
- 
- const getRpcUrl = () => {
- 	if (typeof window === "undefined") return "http://localhost:3000/api/rpc";
--	return `${window.location.origin}/api/rpc`;
-+	return `${window.location.origin}${import.meta.env.BASE_URL}api/rpc`;
- };
- 
- export const client: RouterClient<typeof router> = createORPCClient(
-diff -ruN rr525-orig/apps/web/src/libs/seo.ts rr525/apps/web/src/libs/seo.ts
---- a/apps/web/src/libs/seo.ts	2026-08-16 12:45:25.794133999 +0200
-+++ b/apps/web/src/libs/seo.ts	2026-08-16 12:45:17.445853234 +0200
-@@ -8,7 +8,7 @@
- 	if (!origin) return productionRootUrl;
- 
- 	const url = new URL(origin);
--	url.pathname = "/";
-+	url.pathname = import.meta.env.BASE_URL;
- 	url.search = "";
- 	url.hash = "";
- 
-diff -ruN rr525-orig/apps/web/src/router.tsx rr525/apps/web/src/router.tsx
---- a/apps/web/src/router.tsx	2026-08-16 12:45:25.795513011 +0200
-+++ b/apps/web/src/router.tsx	2026-08-16 12:42:42.478160336 +0200
-@@ -22,6 +22,7 @@
- 	await loadLocale(locale);
- 
- 	const router = createRouter({
-+		basepath: (import.meta.env.BASE_URL || "/").replace(/\/+$/, "") || "/",
- 		routeTree,
- 		scrollRestoration: true,
- 		defaultViewTransition: true,
-diff -ruN rr525-orig/apps/web/src/routes/builder/$resumeId/-components/dock.tsx rr525/apps/web/src/routes/builder/$resumeId/-components/dock.tsx
---- a/apps/web/src/routes/builder/$resumeId/-components/dock.tsx	2026-08-16 12:45:25.807887196 +0200
-+++ b/apps/web/src/routes/builder/$resumeId/-components/dock.tsx	2026-08-16 12:43:58.489080222 +0200
-@@ -72,7 +72,9 @@
+ function html(body: string, status: number, headers: Record<string, string> = {}) {
+ 	return new Response(body, {
+@@ -122,7 +124,7 @@ export function movedResponse(
+ 	return new Response(null, {
+ 		status: permanent ? 301 : 302,
+ 		headers: {
+-			Location: `${target.pathname}${target.search}`,
++			Location: `${basePath()}${target.pathname}${target.search}`,
+ 			"Cache-Control": "no-store",
+ 		},
  	});
+@@ -139,7 +141,7 @@ async function showPage(request: Request, match: ResumeMatch, trustedClient: str
+ 		if (appPath)
+ 			return new Response(null, {
+ 				status: 302,
+-				headers: { Location: `${appPath}${new URL(request.url).search}`, "Cache-Control": "no-store" },
++				headers: { Location: `${basePath()}${appPath}${new URL(request.url).search}`, "Cache-Control": "no-store" },
+ 			});
+ 		return unavailableResponse(request, result.ownerResumeId);
+ 	}
+@@ -205,7 +207,8 @@ async function submitPassword(request: Request, match: ResumeMatch, trustedClien
+ 		options.customDomain || "id" in match
+ 			? "/"
+ 			: publicResumePath({ slug: "", ...match, isPrimary: "primary" in match });
+-	responseHeaders.set("Location", valid ? page : `${page}?wrong-password`);
++	const location = `${options.customDomain ? "" : basePath()}${page}`;
++	responseHeaders.set("Location", valid ? location : `${location}?wrong-password`);
+ 	responseHeaders.set("Cache-Control", "no-store");
+ 	return new Response(null, { status: 303, headers: responseHeaders });
+ }
+diff --git a/apps/server/src/static/web.ts b/apps/server/src/static/web.ts
+index a0387397f..40a8efe31 100644
+--- a/apps/server/src/static/web.ts
++++ b/apps/server/src/static/web.ts
+@@ -136,7 +136,7 @@ function preloadLinks(html: string) {
+  */
+ function htmlResponse(html: string, headers: Record<string, string>, template = html) {
+ 	const verification = new URL(CONTEXT7_ASK_URL).searchParams.get("siteKey") ?? "";
+-	const note = `<blockquote data-context7-ask="true" aria-hidden="true" class="sr-only"><h2>Search</h2><p>Page index: ${escapeHtml(new URL("/llms.txt", env.APP_URL).toString())}.</p><p>${escapeHtml(CONTEXT7_ASK_DESCRIPTION)}</p></blockquote>`;
++	const note = `<blockquote data-context7-ask="true" aria-hidden="true" class="sr-only"><h2>Search</h2><p>Page index: ${escapeHtml(`${env.APP_URL.replace(/\/+$/, "")}/llms.txt`)}.</p><p>${escapeHtml(CONTEXT7_ASK_DESCRIPTION)}</p></blockquote>`;
+ 	const body = html
+ 		.replace("</head>", () => `<meta name="context7-site-verification" content="${verification}"></head>`)
+ 		.replace(/<body\b[^>]*>/i, (tag) => `${tag}${note}`);
+@@ -419,7 +419,7 @@ export async function handleWebApp(request: Request, readFile: ReadWebFile = (pa
  
- 	const publicUrl =
--		session?.user.username && resumeSlug ? `${window.location.origin}/${session.user.username}/${resumeSlug}` : "";
-+		session?.user.username && resumeSlug
-+			? `${window.location.origin}${import.meta.env.BASE_URL}${session.user.username}/${resumeSlug}`
-+			: "";
+ 	// The footer's "Templates" and old links: the gallery lives at /resume-templates. Old per-template previews stay gone.
+ 	if (pathname === "/templates" || pathname === "/templates/")
+-		return new Response(null, { status: 301, headers: { Location: `/resume-templates${requestUrl.search}` } });
++		return new Response(null, { status: 301, headers: { Location: `${new URL(env.APP_URL).pathname.replace(/\/+$/, "")}/resume-templates${requestUrl.search}` } });
  
- 	return (
- 		<div className="fixed inset-x-0 bottom-20 flex items-center justify-center md:bottom-4">
-diff -ruN rr525-orig/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx rr525/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx
---- a/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx	2026-08-16 12:45:25.812552701 +0200
-+++ b/apps/web/src/routes/builder/$resumeId/-sidebar/left/sections/picture.tsx	2026-08-16 12:42:42.478671637 +0200
-@@ -369,13 +369,13 @@
+ 	const headers = getFallbackResponseHeaders(pathname);
+ 	if (!headers)
+@@ -436,7 +436,7 @@ export async function handleWebApp(request: Request, readFile: ReadWebFile = (pa
+ 	const prerendered = prerenderedPages[pathname];
+ 	if (prerendered) {
+ 		const { locale, requested } = getPageLocale(request) ?? { locale: defaultLocale, requested: false };
+-		const origin = new URL(env.APP_URL).origin;
++		const origin = env.APP_URL.replace(/\/+$/, "");
+ 		// Without a prerendered page (a build that skipped it), the app shell titled for the page renders it in the browser.
+ 		let textLocale: Locale = locale;
+ 		const page = await readFile(`${prerenderRoot}/${prerendered.name}/${locale}.html`).catch(() => {
+@@ -446,7 +446,7 @@ export async function handleWebApp(request: Request, readFile: ReadWebFile = (pa
+ 		});
+ 		const meta = readPageMeta(page, prerendered.meta);
+ 		const markup = createPageSeoMarkup({
+-			canonicalUrl: new URL(pathname, env.APP_URL).toString(),
++			canonicalUrl: `${env.APP_URL.replace(/\/+$/, "")}${pathname}`,
+ 			locale,
+ 			requested,
+ 			...meta,
+diff --git a/apps/web/src/features/applications/components/attachment-preview.tsx b/apps/web/src/features/applications/components/attachment-preview.tsx
+index 6a0129f4b..0a97bdaf9 100644
+--- a/apps/web/src/features/applications/components/attachment-preview.tsx
++++ b/apps/web/src/features/applications/components/attachment-preview.tsx
+@@ -42,7 +42,7 @@ export function AttachmentPreview({ source, name }: AttachmentPreviewProps) {
+ 				if (source.size > 10 * 1024 * 1024) throw new Error("PDF too large.");
+ 				bytes = new Uint8Array(await source.arrayBuffer());
+ 			} else {
+-				const response = await fetch(privateUploadUrl(source, window.location.origin), {
++				const response = await fetch(privateUploadUrl(source, `${window.location.origin}${import.meta.env.BASE_URL}`), {
+ 					credentials: "same-origin",
+ 					cache: "no-store",
+ 					redirect: "error",
+diff --git a/apps/web/src/features/auth/redirect.ts b/apps/web/src/features/auth/redirect.ts
+index 76e9691b6..8b458c432 100644
+--- a/apps/web/src/features/auth/redirect.ts
++++ b/apps/web/src/features/auth/redirect.ts
+@@ -27,7 +27,11 @@ export function getAuthRedirectOptions(value: unknown) {
+ 	const callbackURL = safeCallbackURL(value);
+ 	// OAuth callbacks are server endpoints; they must run through a document request.
+ 	const isServerCallback = callbackURL !== undefined && callbackURL.startsWith("/api/");
+-	return { href: callbackURL ?? "/dashboard", reloadDocument: isServerCallback, replace: true } as const;
++	return {
++		href: isServerCallback ? `${import.meta.env.BASE_URL}${callbackURL.slice(1)}` : (callbackURL ?? "/dashboard"),
++		reloadDocument: isServerCallback,
++		replace: true,
++	} as const;
+ }
+ 
+ export function getOAuthSignInOptions(callback: unknown) {
+diff --git a/apps/web/src/features/resume/editor/write/picture-settings.tsx b/apps/web/src/features/resume/editor/write/picture-settings.tsx
+index 1f785be2c..be7ab3979 100644
+--- a/apps/web/src/features/resume/editor/write/picture-settings.tsx
++++ b/apps/web/src/features/resume/editor/write/picture-settings.tsx
+@@ -344,13 +344,13 @@ type PictureValues = z.infer<typeof pictureSchema>;
  
  function normalizePictureUrl(url: string, origin: string): string {
  	if (!url) return url;
@@ -256,126 +157,311 @@ diff -ruN rr525-orig/apps/web/src/routes/builder/$resumeId/-sidebar/left/section
  	} catch {
  		return url;
  	}
-diff -ruN rr525-orig/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx rr525/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx
---- a/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx	2026-08-16 12:45:25.820463106 +0200
-+++ b/apps/web/src/routes/builder/$resumeId/-sidebar/right/sections/sharing.tsx	2026-08-16 12:43:58.489560133 +0200
-@@ -29,7 +29,9 @@
- 	const { mutateAsync: setPassword } = useMutation(orpc.resume.setPassword.mutationOptions());
- 	const { mutateAsync: removePassword } = useMutation(orpc.resume.removePassword.mutationOptions());
+diff --git a/apps/web/src/features/resume/share/use-share-origin.ts b/apps/web/src/features/resume/share/use-share-origin.ts
+index 45fcddcae..cfc09184f 100644
+--- a/apps/web/src/features/resume/share/use-share-origin.ts
++++ b/apps/web/src/features/resume/share/use-share-origin.ts
+@@ -6,5 +6,5 @@ export function useShareOrigin() {
+ 		select: (state): string | undefined => state.matches.at(-1)?.context.flags?.aliasUrl,
+ 	});
+ 	// Build-time marketing renders have neither route matches nor a deployment origin.
+-	return aliasUrl ?? (typeof window === "undefined" ? "" : window.location.origin);
++	return aliasUrl ?? (typeof window === "undefined" ? "" : `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/+$/, "")}`);
+ }
+diff --git a/apps/web/src/features/resume/share/web-page-preview.tsx b/apps/web/src/features/resume/share/web-page-preview.tsx
+index 31f2383ab..9309e9f78 100644
+--- a/apps/web/src/features/resume/share/web-page-preview.tsx
++++ b/apps/web/src/features/resume/share/web-page-preview.tsx
+@@ -29,14 +29,14 @@ async function renderPreview(data: ResumeData, settings: PreviewSettings) {
+ 		visible = structuredClone(data);
+ 		removeContactDetails(visible);
+ 	}
+-	const page = await renderResumeWebPage({ data: visible, imageUrl: webPageImageUrl(window.location.origin) });
++	const page = await renderResumeWebPage({ data: visible, imageUrl: webPageImageUrl(`${window.location.origin}${import.meta.env.BASE_URL.replace(/\/+$/, "")}`) });
+ 	return renderWebPageDocument({
+ 		page,
+ 		messages: webPageMessages(visible.metadata.page.locale),
+ 		// The preview is inert (no scripts, no requests); these only decide which controls show.
+ 		downloadUrl: settings.showDownloadButtons ? "#" : undefined,
+ 		wordDownloadUrl: settings.allowWordDownload ? "#" : undefined,
+-		creditUrl: data.metadata.web?.showCredit === false ? undefined : window.location.origin,
++		creditUrl: data.metadata.web?.showCredit === false ? undefined : `${window.location.origin}${import.meta.env.BASE_URL}`,
+ 	});
+ }
  
--	const publicUrl = session ? `${window.location.origin}/${session.user.username}/${resume.slug}` : "";
-+	const publicUrl = session
-+		? `${window.location.origin}${import.meta.env.BASE_URL}${session.user.username}/${resume.slug}`
-+		: "";
+diff --git a/apps/web/src/features/settings/ai/api-keys.tsx b/apps/web/src/features/settings/ai/api-keys.tsx
+index 59344ff55..3d28fef8c 100644
+--- a/apps/web/src/features/settings/ai/api-keys.tsx
++++ b/apps/web/src/features/settings/ai/api-keys.tsx
+@@ -214,7 +214,7 @@ const EXPIRIES: Expiry[] = [
+ /** A ready-to-paste MCP client entry for this instance, with the new key in its header. */
+ const mcpConfig = (key: string) =>
+ 	JSON.stringify(
+-		{ mcpServers: { "reactive-resume": { url: `${window.location.origin}/mcp`, headers: { "x-api-key": key } } } },
++		{ mcpServers: { "reactive-resume": { url: `${window.location.origin}${import.meta.env.BASE_URL}mcp`, headers: { "x-api-key": key } } } },
+ 		null,
+ 		2,
+ 	);
+diff --git a/apps/web/src/features/settings/ai/mcp.tsx b/apps/web/src/features/settings/ai/mcp.tsx
+index 252c87367..df4b6f6b7 100644
+--- a/apps/web/src/features/settings/ai/mcp.tsx
++++ b/apps/web/src/features/settings/ai/mcp.tsx
+@@ -6,7 +6,7 @@ import { Swap } from "@reactive-resume/ui/components/swap";
+ import { SettingsSection } from "../section";
  
- 	const onCopyUrl = useCallback(async () => {
- 		await copyToClipboard(publicUrl);
-diff -ruN rr525-orig/apps/web/src/routes/_home/index.tsx rr525/apps/web/src/routes/_home/index.tsx
---- a/apps/web/src/routes/_home/index.tsx	2026-08-16 12:45:25.800526741 +0200
-+++ b/apps/web/src/routes/_home/index.tsx	2026-08-16 12:45:17.445454009 +0200
-@@ -20,7 +20,12 @@
- 		return {
- 			links: [
- 				{ rel: "canonical", href: canonicalUrl },
--				{ rel: "preload", href: "/videos/timelapse-v1.webp", as: "image", fetchPriority: "high" },
-+				{
-+					rel: "preload",
-+					href: `${import.meta.env.BASE_URL}videos/timelapse-v1.webp`,
-+					as: "image",
-+					fetchPriority: "high",
-+				},
- 			],
- 			scripts: [createRootStructuredDataScript(canonicalUrl)],
- 		};
-diff -ruN rr525-orig/apps/web/src/routes/_home/-sections/hero.tsx rr525/apps/web/src/routes/_home/-sections/hero.tsx
---- a/apps/web/src/routes/_home/-sections/hero.tsx	2026-08-16 12:45:25.799061802 +0200
-+++ b/apps/web/src/routes/_home/-sections/hero.tsx	2026-08-16 12:49:48.811737872 +0200
-@@ -34,8 +34,8 @@
- 						preload="none"
- 						width={1146}
- 						height={720}
--						poster="/videos/timelapse-v1.webp"
--						src="/videos/timelapse-v1.mp4"
-+						poster={`${import.meta.env.BASE_URL}videos/timelapse-v1.webp`}
-+						src={`${import.meta.env.BASE_URL}videos/timelapse-v1.mp4`}
- 						aria-label={t`Timelapse demonstration of building a resume with Reactive Resume`}
- 						className="aspect-[1146/720] w-full rounded-md border object-cover"
- 					/>
-diff -ruN rr525-orig/apps/web/src/routes/__root.tsx rr525/apps/web/src/routes/__root.tsx
---- a/apps/web/src/routes/__root.tsx	2026-08-16 12:45:25.796500224 +0200
-+++ b/apps/web/src/routes/__root.tsx	2026-08-16 12:45:17.445097913 +0200
-@@ -55,11 +55,16 @@
- 		return {
- 			links: [
- 				// Icons
--				{ rel: "icon", href: "/favicon.ico", type: "image/x-icon", sizes: "128x128" },
--				{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml", sizes: "256x256 any" },
--				{ rel: "apple-touch-icon", href: "/apple-touch-icon-180x180.png", type: "image/png", sizes: "180x180 any" },
-+				{ rel: "icon", href: `${import.meta.env.BASE_URL}favicon.ico`, type: "image/x-icon", sizes: "128x128" },
-+				{ rel: "icon", href: `${import.meta.env.BASE_URL}favicon.svg`, type: "image/svg+xml", sizes: "256x256 any" },
-+				{
-+					rel: "apple-touch-icon",
-+					href: `${import.meta.env.BASE_URL}apple-touch-icon-180x180.png`,
-+					type: "image/png",
-+					sizes: "180x180 any",
-+				},
- 				// Manifest
--				{ rel: "manifest", href: "/manifest.webmanifest", crossOrigin: "use-credentials" },
-+				{ rel: "manifest", href: `${import.meta.env.BASE_URL}manifest.webmanifest`, crossOrigin: "use-credentials" },
- 			],
- 			meta: [
- 				{ title },
-diff -ruN rr525-orig/apps/web/vite.config.ts rr525/apps/web/vite.config.ts
---- a/apps/web/vite.config.ts	2026-08-16 12:45:25.833402611 +0200
-+++ b/apps/web/vite.config.ts	2026-08-16 12:42:42.479148845 +0200
-@@ -28,6 +28,7 @@
+ export function McpSection() {
+-	const address = `${window.location.origin}/mcp`;
++	const address = `${window.location.origin}${import.meta.env.BASE_URL}mcp`;
+ 	const [copied, setCopied] = useState(false);
+ 	const [, copy] = useCopyToClipboard();
+ 
+diff --git a/apps/web/src/libs/auth/client.ts b/apps/web/src/libs/auth/client.ts
+index e2107b8d5..6c8fa1104 100644
+--- a/apps/web/src/libs/auth/client.ts
++++ b/apps/web/src/libs/auth/client.ts
+@@ -16,6 +16,7 @@ import { getAccountId } from "./account-scope";
+ import { authSearchSchema } from "@/features/auth/redirect";
+ 
+ export const authClient = createAuthClient({
++	baseURL: typeof window === "undefined" ? undefined : `${window.location.origin}${import.meta.env.BASE_URL}api/auth`,
+ 	// New accounts start in the device timezone instead of UTC. Social sign-in carries this into the
+ 	// OAuth state on the server; email and guest creation read it directly. A static header merges
+ 	// with per-call options, unlike a global onRequest that a per-call one would replace.
+@@ -49,7 +50,7 @@ export const authClient = createAuthClient({
+ 				const search = callbackURL
+ 					? `?${new URLSearchParams({ callbackURL, ...(reauthenticate ? { reauthenticate: "true" } : {}) })}`
+ 					: "";
+-				window.location.href = `/auth/verify-2fa${search}`;
++				window.location.href = `${import.meta.env.BASE_URL}auth/verify-2fa${search}`;
+ 			},
+ 		}),
+ 		oauthProviderClient(),
+diff --git a/apps/web/src/libs/orpc/client.ts b/apps/web/src/libs/orpc/client.ts
+index 2ec0b4d5d..85a98d93a 100644
+--- a/apps/web/src/libs/orpc/client.ts
++++ b/apps/web/src/libs/orpc/client.ts
+@@ -26,7 +26,7 @@ export type ClientContext = {
+ 	nativeSearchFallback?: boolean;
+ };
+ 
+-const getRpcUrl = () => `${window.location.origin}/api/rpc`;
++const getRpcUrl = () => `${window.location.origin}${import.meta.env.BASE_URL}api/rpc`;
+ 
+ const headers = ({ context }: { context: ClientContext }) => ({
+ 	...(context.accountId ? { "x-account-id": context.accountId } : {}),
+diff --git a/apps/web/src/libs/orpc/fetch.ts b/apps/web/src/libs/orpc/fetch.ts
+index ff1084a99..813f7beed 100644
+--- a/apps/web/src/libs/orpc/fetch.ts
++++ b/apps/web/src/libs/orpc/fetch.ts
+@@ -40,7 +40,7 @@ export async function rpcFetch(
+ 	if (stagingUnavailable || body.byteLength < 3 * 1024 * 1024) return sendDirect();
+ 
+ 	const url = new URL(request.url);
+-	const prepared = await fetch("/api/storage/stage", {
++	const prepared = await fetch(`${import.meta.env.BASE_URL}api/storage/stage`, {
+ 		method: "POST",
+ 		credentials: "include",
+ 		signal: request.signal,
+diff --git a/apps/web/src/router.tsx b/apps/web/src/router.tsx
+index f1ba65334..0b3f1820f 100644
+--- a/apps/web/src/router.tsx
++++ b/apps/web/src/router.tsx
+@@ -30,6 +30,7 @@ export const getRouter = async () => {
+ 	const { theme, locale, session, flags } = await loadRootContext(queryClient);
+ 
+ 	const router = createRouter({
++		basepath: (import.meta.env.BASE_URL || "/").replace(/\/+$/, "") || "/",
+ 		routeTree,
+ 		scrollRestoration: true,
+ 		defaultStructuralSharing: true,
+diff --git a/apps/web/vite.config.ts b/apps/web/vite.config.ts
+index b09752027..f6498441a 100644
+--- a/apps/web/vite.config.ts
++++ b/apps/web/vite.config.ts
+@@ -1,5 +1,5 @@
+ import type { Plugin, ProxyOptions } from "vite-plus";
+-import { readFileSync } from "node:fs";
++import { readFileSync, readdirSync } from "node:fs";
+ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+ import { fileURLToPath, pathToFileURL } from "node:url";
+ import { lingui } from "@lingui/vite-plugin";
+@@ -41,7 +41,7 @@ async function prerenderPages() {
+ 		.map((prefix) => {
+ 			const asset = assets.find((name) => name.startsWith(prefix) && name.endsWith(".woff2"));
+ 			if (!asset) throw new Error(`Missing marketing font: ${prefix}`);
+-			return `<link rel="preload" as="font" type="font/woff2" href="/assets/${asset}" crossorigin>`;
++			return `<link rel="preload" as="font" type="font/woff2" href="${base}assets/${asset}" crossorigin>`;
+ 		})
+ 		.join("");
+ 
+@@ -160,7 +160,31 @@ const serverProxy = serverPaths.reduce(
+ 	{} as Record<string, ProxyOptions>,
  );
  
++// Served under a URL sub-path (reactive-resume-nix appBasePath). "/" = the web root.
++const base = process.env.APP_BASE_PATH || "/";
++
++// Vite re-roots index.html and CSS URLs against `base`, but not the root-absolute public-file paths the app writes as
++// string literals (`/templates/…`, `/logo/…`, `/sounds/…`). Prefix those in app sources, for every top-level entry
++// of public/ (and the capture helper the prebuild writes there).
++const publicEntries = [...readdirSync(new URL("./public", import.meta.url)), "capture-helper", "capture-helper.zip"]
++	.map((name) => name.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&"))
++	.join("|");
++const publicPathPattern = new RegExp(`(?<=[\\s"'\`,(])/(?=(?:${publicEntries})(?:[/"'\`?#\\s,)]|$))`, "g");
++const basePathPlugin = (): Plugin => ({
++	name: "base-path-public-files",
++	enforce: "pre",
++	transform: {
++		filter: { id: /[\\/](?:apps[\\/]web|packages)[\\/][^?]*\.[cm]?[jt]sx?(?:\?.*)?$/ },
++		handler(code, id) {
++			if (base === "/" || id.includes("node_modules")) return;
++			const result = code.replace(publicPathPattern, base);
++			return result === code ? undefined : { code: result, map: null };
++		},
++	},
++});
++
  export default defineConfig({
-+	base: process.env.APP_BASE_PATH || "/",
++	base,
  	envDir: workspaceRoot,
  
  	resolve: {
-diff -ruN rr525-orig/packages/api/src/features/resume/pdf-download-url.ts rr525/packages/api/src/features/resume/pdf-download-url.ts
---- a/packages/api/src/features/resume/pdf-download-url.ts	2026-08-16 12:45:25.976779268 +0200
-+++ b/packages/api/src/features/resume/pdf-download-url.ts	2026-08-16 12:42:42.479349699 +0200
-@@ -92,7 +92,7 @@
+@@ -230,6 +254,7 @@ export default defineConfig({
+ 	},
+ 
+ 	plugins: [
++		basePathPlugin(),
+ 		phosphorWeightsPlugin(),
+ 		{
+ 			name: "cloudflare-rocket-loader-bootstrap",
+diff --git a/packages/api/src/features/career/jobs.ts b/packages/api/src/features/career/jobs.ts
+index 524af3718..5add8f8e0 100644
+--- a/packages/api/src/features/career/jobs.ts
++++ b/packages/api/src/features/career/jobs.ts
+@@ -860,7 +860,7 @@ async function sendPendingEmail() {
+ 				to: owner.email,
+ 				subject: noticeText(notification.notice).title,
+ 				text: "You have a career update in Reactive Resume.",
+-				url: new URL(notification.url ?? CAREER_URL, env.APP_URL).toString(),
++				url: `${env.APP_URL.replace(/\/+$/, "")}${notification.url ?? CAREER_URL}`,
+ 				key: notification.key,
+ 			});
+ 			if (!sent) throw new Error("SMTP unavailable");
+diff --git a/packages/api/src/features/resume/pdf-download-url.ts b/packages/api/src/features/resume/pdf-download-url.ts
+index 03ba021f0..92d112e88 100644
+--- a/packages/api/src/features/resume/pdf-download-url.ts
++++ b/packages/api/src/features/resume/pdf-download-url.ts
+@@ -76,7 +76,7 @@ export function createResumePdfDownloadUrl({ resumeId, userId, now = new Date()
  		issuedAt: now.getTime(),
  	} satisfies PdfDownloadTokenPayload);
  	const token = `${payload}.${sign(payload)}`;
 -	const url = new URL(`/api/resumes/${encodeURIComponent(resumeId)}/pdf`, env.APP_URL);
-+	const url = new URL(`${env.APP_URL}/api/resumes/${encodeURIComponent(resumeId)}/pdf`);
++	const url = new URL(`${env.APP_URL.replace(/\/+$/, "")}/api/resumes/${encodeURIComponent(resumeId)}/pdf`);
  	url.searchParams.set("token", token);
- 	if (target) url.searchParams.set("target", target);
  
-diff -ruN rr525-orig/packages/api/src/features/storage/service.ts rr525/packages/api/src/features/storage/service.ts
---- a/packages/api/src/features/storage/service.ts	2026-08-16 12:45:25.985608810 +0200
-+++ b/packages/api/src/features/storage/service.ts	2026-08-16 12:42:42.479540108 +0200
-@@ -75,7 +75,7 @@
+ 	return {
+diff --git a/packages/api/src/features/resume/web-page.ts b/packages/api/src/features/resume/web-page.ts
+index 2bdaf4c43..d87cb86c9 100644
+--- a/packages/api/src/features/resume/web-page.ts
++++ b/packages/api/src/features/resume/web-page.ts
+@@ -169,7 +169,7 @@ export async function webPagePreviewUrl(id: string, userId: string): Promise<str
+ 		eq(schema.resume.userId, userId),
+ 	);
+ 	if (!resume) return null;
+-	const url = new URL(publicResumePath(resume), env.APP_URL);
++	const url = new URL(`${env.APP_URL.replace(/\/+$/, "")}${publicResumePath(resume)}`);
+ 	url.searchParams.set("preview", createPreviewToken(id));
+ 	return url.href;
+ }
+diff --git a/packages/api/src/features/storage/service.ts b/packages/api/src/features/storage/service.ts
+index 1f083dd2a..a40a49903 100644
+--- a/packages/api/src/features/storage/service.ts
++++ b/packages/api/src/features/storage/service.ts
+@@ -82,7 +82,7 @@ function buildFileKey(userId: string, contentType: string): string {
  function buildPublicUrl(path: string): string {
  	const normalizedPath = path.startsWith("/") ? path : `/${path}`;
  	const apiPath = normalizedPath.startsWith("/api/") ? normalizedPath : `/api${normalizedPath}`;
 -	return new URL(apiPath, env.APP_URL).toString();
-+	return new URL(env.APP_URL + apiPath).toString();
++	return new URL(`${env.APP_URL.replace(/\/+$/, "")}${apiPath}`).toString();
  }
  
  export function inferContentType(filename: string): string {
-diff -ruN rr525-orig/packages/auth/src/config.ts rr525/packages/auth/src/config.ts
---- a/packages/auth/src/config.ts	2026-08-16 12:45:25.988754931 +0200
-+++ b/packages/auth/src/config.ts	2026-08-16 12:42:42.479725961 +0200
-@@ -92,7 +92,7 @@
+diff --git a/packages/auth/src/config.ts b/packages/auth/src/config.ts
+index 9aaedcb06..43830de53 100644
+--- a/packages/auth/src/config.ts
++++ b/packages/auth/src/config.ts
+@@ -698,7 +698,8 @@ const getAuthConfig = () => {
  
  	return betterAuth({
  		appName: "Reactive Resume",
 -		baseURL: authBaseUrl,
++		// The proxy strips a sub-path before forwarding, so Better Auth routes at the origin root.
 +		baseURL: new URL(authBaseUrl).origin,
  		secret: env.AUTH_SECRET,
  
  		database: drizzleAdapter(db, { schema, provider: "pg" }),
-diff -ruN rr525-orig/packages/ui/src/components/brand-icon.tsx rr525/packages/ui/src/components/brand-icon.tsx
---- a/packages/ui/src/components/brand-icon.tsx	2026-08-16 12:45:26.141640710 +0200
-+++ b/packages/ui/src/components/brand-icon.tsx	2026-08-16 12:42:42.480242244 +0200
-@@ -8,13 +8,13 @@
+diff --git a/packages/mcp/src/parity.ts b/packages/mcp/src/parity.ts
+index 4eaba62db..4e0f317ea 100644
+--- a/packages/mcp/src/parity.ts
++++ b/packages/mcp/src/parity.ts
+@@ -440,8 +440,7 @@ export function registerParityTools(
+ 					await (path.endsWith(".resume") ? client.resume.getById({ id }) : client.coverLetters.getById({ id }));
+ 					const collection = path.endsWith(".resume") ? "resumes" : "cover-letters";
+ 					const url = new URL(
+-						`/api/openapi/${collection}/${encodeURIComponent(id)}/exports/${encodeURIComponent(format)}`,
+-						env.APP_URL,
++						`${env.APP_URL.replace(/\/+$/, "")}/api/openapi/${collection}/${encodeURIComponent(id)}/exports/${encodeURIComponent(format)}`,
+ 					);
+ 					if (words) for (const [key, value] of Object.entries(words)) url.searchParams.set(`words[${key}]`, value);
+ 					return json({ url: url.toString(), requiresAuthentication: true });
+@@ -491,13 +490,13 @@ export function registerParityTools(
+ 		if (!meta) throw new Error(`Missing browser workflow contract: ${path}`);
+ 		server.registerTool(name, meta, (input) =>
+ 			json({
+-				url: new URL(url(input as Record<string, string>), env.APP_URL).toString(),
++				url: `${env.APP_URL.replace(/\/+$/, "")}${url(input as Record<string, string>)}`,
+ 				action: path,
+ 				requiresBrowser: true,
+ 			}),
+ 		);
+ 	}
+ 	server.registerTool("open_account_settings", accountToolMeta, ({ page }) =>
+-		json({ url: new URL(ACCOUNT_SETTINGS_PATHS[page], env.APP_URL).toString(), requiresBrowser: true }),
++		json({ url: `${env.APP_URL.replace(/\/+$/, "")}${ACCOUNT_SETTINGS_PATHS[page]}`, requiresBrowser: true }),
+ 	);
+ }
+diff --git a/packages/pdf/src/forme/images.node.ts b/packages/pdf/src/forme/images.node.ts
+index a1aae469f..3fe71951a 100644
+--- a/packages/pdf/src/forme/images.node.ts
++++ b/packages/pdf/src/forme/images.node.ts
+@@ -18,10 +18,12 @@ export function readServerImage(
+ ): Promise<Uint8Array> {
+ 	if (/^data:image\/(?:png|jpeg|webp);base64,/i.test(source)) return readImageBytes(source);
+ 	const url = new URL(source);
++	const prefix = uploadOrigin === undefined ? "" : new URL(uploadOrigin).pathname.replace(/\/+$/, "");
++	const ownPath = url.pathname.startsWith(`${prefix}/`) ? url.pathname.slice(prefix.length) : url.pathname;
+ 	const ownPicture =
+ 		uploadOrigin !== undefined &&
+ 		url.origin === new URL(uploadOrigin).origin &&
+-		/^\/(?:api\/)?uploads\/[A-Za-z0-9_-]+\/pictures\/[A-Za-z0-9_-]+\.(?:png|jpe?g|webp)$/.test(url.pathname) &&
++		/^\/(?:api\/)?uploads\/[A-Za-z0-9_-]+\/pictures\/[A-Za-z0-9_-]+\.(?:png|jpe?g|webp)$/.test(ownPath) &&
+ 		!url.search;
+ 	if (
+ 		!/^https?:$/.test(url.protocol) ||
+@@ -31,7 +33,7 @@ export function readServerImage(
+ 	)
+ 		return Promise.reject(new Error("Private or invalid image URL refused"));
+ 	signal.throwIfAborted();
+-	if (ownPicture && ownPictureReader) return ownPictureReader(url.pathname.replace(/^\/(?:api\/)?/, ""));
++	if (ownPicture && ownPictureReader) return ownPictureReader(ownPath.replace(/^\/(?:api\/)?/, ""));
+ 	if (process.env.CLOUDFLARE === "1") return readWorkerImage(url, signal);
+ 	return new Promise((resolve, reject) => {
+ 		const request = url.protocol === "https:" ? httpsRequest : httpRequest;
+diff --git a/packages/ui/src/components/brand-icon.tsx b/packages/ui/src/components/brand-icon.tsx
+index 8a98dac1a..b45240f35 100644
+--- a/packages/ui/src/components/brand-icon.tsx
++++ b/packages/ui/src/components/brand-icon.tsx
+@@ -8,13 +8,13 @@ export function BrandIcon({ variant = "logo", className, ...props }: Props) {
  	return (
  		<>
  			<img
@@ -391,3 +477,23 @@ diff -ruN rr525-orig/packages/ui/src/components/brand-icon.tsx rr525/packages/ui
  				alt="Reactive Resume"
  				className={cn("block size-12 dark:hidden", className)}
  				{...props}
+diff --git a/packages/utils/src/http.ts b/packages/utils/src/http.ts
+index 20439d877..1e1f35652 100644
+--- a/packages/utils/src/http.ts
++++ b/packages/utils/src/http.ts
+@@ -83,12 +83,14 @@ export const isNetworkError = (error: unknown) => error instanceof TypeError &&
+ export function privateUploadUrl(source: string, server: string): string {
+ 	const origin = new URL(server);
+ 	const url = new URL(source, origin);
++	const prefix = origin.pathname.replace(/\/+$/, "");
+ 	if (
+ 		!["http:", "https:"].includes(url.protocol) ||
+ 		url.origin !== origin.origin ||
+ 		url.username ||
+ 		url.password ||
+-		!/^\/(?:api\/)?uploads\//.test(url.pathname)
++		!url.pathname.startsWith(`${prefix}/`) ||
++		!/^\/(?:api\/)?uploads\//.test(url.pathname.slice(prefix.length))
+ 	)
+ 		throw new Error("Invalid private upload URL.");
+ 	return url.href;

@@ -15,7 +15,7 @@
 #   DATABASE_URL=postgresql://reactive_resume:<password>@127.0.0.1:5432/reactive_resume
 #   AUTH_SECRET=<32+ byte secret>
 #
-# Reactive Resume v5 is a single Node (Hono) process serving the built Vite SPA
+# Reactive Resume v6 is a single Node (Hono) process serving the built Vite SPA
 # plus the REST/oRPC API. It uses Drizzle ORM with raw-SQL migrations that the
 # server SELF-APPLIES on boot (apps/server/src/startup/checks.ts, walking up to
 # migrations/), so there is no separate migrate oneshot — the app just needs a
@@ -25,13 +25,14 @@
 # (recommended on memory-constrained hosts), wrap it with a socket-activation
 # proxy on the host side — the module changes nothing to support that beyond
 # leaving `host`/`port` configurable.
-self:
+{ self, pnpmPkgsFor }:
 { config, lib, pkgs, ... }:
 
 let
   cfg = config.services.reactive-resume;
   defaultPackage = pkgs.callPackage (self + "/package.nix") {
     inherit (cfg) appBasePath;
+    pnpmPkgs = pnpmPkgsFor pkgs.stdenv.hostPlatform.system;
   };
 
   appEnv = {
