@@ -64,13 +64,14 @@ stdenv.mkDerivation (finalAttrs: {
     "@reactive-resume/tooling..."
   ];
 
-  # PER-SYSTEM. Since pnpm 11.18 the store pnpm materialises is pruned to the host
-  # platform's native bindings, so the two arches hash differently. Renovate fills
-  # only the x86_64 slot; compute aarch64 by hand ON THE PI:
-  #   bash ci/renovate-update.sh
-  # The fetcher comes from this flake's `nixpkgs-pnpm` input, which consumers do not
-  # override, so the hash no longer depends on the consumer's nixpkgs (it did in v5,
-  # where nic-os's pin and this flake's unstable produced different hashes).
+  # Kept per-system (ci/renovate-update.sh rewrites one slot per host), but for 6.1.0
+  # both slots are the SAME value: the nixpkgs-pnpm fetcher sets
+  # pnpm_config_force_ignores_platform, so the store holds every platform's native
+  # bindings and pnpmConfigHook picks the host's at install time. Measured on a
+  # GitHub x86_64 runner and a GitHub arm64 runner (nic-os CI), both through this
+  # flake's pinned `nixpkgs-pnpm`, which consumers do not override — so the hash no
+  # longer depends on the consumer's nixpkgs either. If a bump ever makes them
+  # differ again, compute aarch64 on the Pi: `bash ci/renovate-update.sh`.
   pnpmDeps = pnpmPkgs.fetchPnpmDeps {
     inherit (finalAttrs) version src pnpmWorkspaces;
     # fetchPnpmDeps names the FOD from pname alone; without the version a stale
@@ -83,8 +84,8 @@ stdenv.mkDerivation (finalAttrs: {
     pnpm_config_network_concurrency = "4";
     hash =
       {
-        x86_64-linux = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-        aarch64-linux = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        x86_64-linux = "sha256-ykWVOY4FBScZ8r3pz1sqv67IaGt+7G5uQRf4zX47geE=";
+        aarch64-linux = "sha256-ykWVOY4FBScZ8r3pz1sqv67IaGt+7G5uQRf4zX47geE=";
       }
       .${stdenv.hostPlatform.system};
   };
