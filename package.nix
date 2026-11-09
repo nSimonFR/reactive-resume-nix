@@ -78,6 +78,9 @@ stdenv.mkDerivation (finalAttrs: {
     pname = "${finalAttrs.pname}-${finalAttrs.version}";
     pnpm = pnpm_12;
     fetcherVersion = 5;
+    # pnpm's default (16+ parallel tarballs, several hundred MB of buffers) gets
+    # the FOD OOM-killed on a 4 GB Pi. Does not change the output.
+    pnpm_config_network_concurrency = "4";
     hash =
       {
         x86_64-linux = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
