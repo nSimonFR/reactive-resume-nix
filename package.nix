@@ -188,6 +188,8 @@ stdenv.mkDerivation (finalAttrs: {
       package.json pnpm-lock.yaml pnpm-workspace.yaml \
       $out/share/reactive-resume/
     cp -a apps/web apps/server $out/share/reactive-resume/apps/
+    # pnpm's hoisted link to the (uninstalled, uncopied) mobile workspace project.
+    rm $out/share/reactive-resume/node_modules/.pnpm/node_modules/mobile
 
     mkdir -p $out/bin
     cat > $out/bin/reactive-resume <<EOF
