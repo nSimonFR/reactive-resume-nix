@@ -106,7 +106,8 @@ stdenv.mkDerivation (finalAttrs: {
   # wraps ErrorScreen itself) and the gallery thumbnail / home video / __root
   # icon hunks (covered by the Vite transform or moved back into index.html).
   # mcp-api-gateway: MCP_API_TOOLS=search serves the api_* MCP tools through
-  # api_search + api_execute (tools/list 690 KB -> 210 KB); "false" drops them.
+  # api_search + api_execute (tools/list 690 KB -> 210 KB); search-all serves
+  # every tool that way (2 KB); none drops api_*.
   patches = [
     ./patches/mcp-api-gateway.patch
   ]
