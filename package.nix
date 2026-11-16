@@ -45,13 +45,13 @@ let
 in
 stdenv.mkDerivation (finalAttrs: {
   pname = "reactive-resume";
-  version = "6.1.0";
+  version = "6.1.1";
 
   src = fetchFromGitHub {
     owner = "amruthpillai";
     repo = "reactive-resume";
     rev = "v${finalAttrs.version}";
-    hash = "sha256-W+/MUH6ld57vVm830V6Y0klWxLW+HaFiXs6Nyd8ft6U=";
+    hash = "sha256-L7aX9OGx2ehF3JCwCdSncQCHswjPTpnXC/ysEV5v+JY=";
   };
 
   # Only these projects (and their workspace deps, the trailing `...`) are
@@ -84,7 +84,7 @@ stdenv.mkDerivation (finalAttrs: {
     pnpm_config_network_concurrency = "4";
     hash =
       {
-        x86_64-linux = "sha256-ykWVOY4FBScZ8r3pz1sqv67IaGt+7G5uQRf4zX47geE=";
+        x86_64-linux = "sha256-/gul9px2y0iI4TTFPu69HYxW3GiDEmYNsrGXv1oNFWY=";
         aarch64-linux = "sha256-ykWVOY4FBScZ8r3pz1sqv67IaGt+7G5uQRf4zX47geE=";
       }
       .${stdenv.hostPlatform.system};
