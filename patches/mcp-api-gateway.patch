@@ -10,15 +10,16 @@ diff -ruN a/apps/server/src/mcp/server.ts b/apps/server/src/mcp/server.ts
  	registerParityTools,
  	registerPrompts,
  	registerResources,
-@@ -54,6 +56,7 @@
+@@ -54,6 +56,8 @@
  	trustedClient: string,
  	resHeaders: Headers,
  ) {
 +	const apiTools = apiToolsMode();
++	const canWrite = authentication.permissions.includes("write");
  	const server = new McpServer(buildMcpServerInfo(appVersion, env.APP_URL), {
  		instructions: [
  			"Reactive Resume holds the user's resumes, cover letters and job applications.",
-@@ -61,7 +64,19 @@
+@@ -61,7 +65,19 @@
  			`Edit resume content with JSON Patch through \`${MCP_TOOL_NAME.patchResume}\`, and change a resume's name, slug, tags or public visibility with \`${MCP_TOOL_NAME.updateResume}\`.`,
  			`Track job applications with the application tools, starting from \`${MCP_TOOL_NAME.listApplications}\`.`,
  			`Get a short-lived PDF link with \`${MCP_TOOL_NAME.downloadResumePdf}\`; export cover letters with \`${MCP_TOOL_NAME.exportCoverLetter}\`.`,
@@ -39,7 +40,7 @@ diff -ruN a/apps/server/src/mcp/server.ts b/apps/server/src/mcp/server.ts
  		].join(" "),
  	});
  
-@@ -69,14 +84,28 @@
+@@ -69,16 +85,30 @@
  	const headers = new Headers(request.headers);
  	headers.delete("cookie");
  	registerResources(server, client);
@@ -66,16 +67,19 @@ diff -ruN a/apps/server/src/mcp/server.ts b/apps/server/src/mcp/server.ts
 +				registerTools(target, client, headers, authentication);
 +				registerApi(target);
 +			},
-+			{ expose: true, captureAll: true, mode: apiTools },
++			{ expose: true, captureAll: true, mode: apiTools, canWrite },
 +		);
 +	else {
 +		registerTools(server, client, headers, authentication);
 +		if (apiTools === "all") registerApi(server);
-+		else registerApiGateway(server, registerApi, { expose: apiTools === "search", mode: apiTools });
++		else registerApiGateway(server, registerApi, { expose: apiTools === "search", mode: apiTools, canWrite });
 +	}
  	registerPrompts(server, client);
- 	registerToolDiscovery(server, { canWrite: authentication.permissions.includes("write") });
+-	registerToolDiscovery(server, { canWrite: authentication.permissions.includes("write") });
++	registerToolDiscovery(server, { canWrite });
  
+ 	return server;
+ }
 diff -ruN a/packages/mcp/src/discovery.ts b/packages/mcp/src/discovery.ts
 --- a/packages/mcp/src/discovery.ts
 +++ b/packages/mcp/src/discovery.ts
@@ -83,7 +87,7 @@ diff -ruN a/packages/mcp/src/discovery.ts b/packages/mcp/src/discovery.ts
  import type { Tool } from "@modelcontextprotocol/sdk/types.js";
  import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
  import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-+import { apiToolsMode, gatewayToolMeta, isApiTool } from "./gateway";
++import { apiToolsMode, GATEWAY_TOOL_NAMES, gatewayToolMeta, isApiTool } from "./gateway";
  import { PARITY_TOOL_META, PARITY_WRITE_TOOLS } from "./parity";
  import { TOOL_META } from "./tool-meta";
  
@@ -102,14 +106,26 @@ diff -ruN a/packages/mcp/src/discovery.ts b/packages/mcp/src/discovery.ts
  		([name, { title, description, inputSchema, outputSchema, annotations }]) => ({
  			name,
  			title,
+@@ -39,7 +49,10 @@
+ 	return (readOnlyDiscovery ??= {
+ 		// Read-only by annotation and by the permission its route needs: a POST that only reads still needs write.
+ 		tools: prepareMcpDiscovery().tools.filter(
+-			(tool) => tool.annotations?.readOnlyHint === true && !PARITY_WRITE_TOOLS.has(tool.name),
++			// The gateway tools stay: they find and run only what a read-only credential may call.
++			(tool) =>
++				GATEWAY_TOOL_NAMES.has(tool.name) ||
++				(tool.annotations?.readOnlyHint === true && !PARITY_WRITE_TOOLS.has(tool.name)),
+ 		),
+ 	});
+ }
 diff -ruN a/packages/mcp/src/gateway.test.ts b/packages/mcp/src/gateway.test.ts
 --- /dev/null
 +++ b/packages/mcp/src/gateway.test.ts
-@@ -0,0 +1,132 @@
+@@ -0,0 +1,177 @@
 +import type { MCP_ROUTER } from "./parity";
 +import type { RouterClient } from "@orpc/server";
 +import type { RequestAuthentication } from "@reactive-resume/api/context";
-+import { expect, it } from "vite-plus/test";
++import { expect, it, vi } from "vite-plus/test";
 +import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 +import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 +import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -238,16 +254,61 @@ diff -ruN a/packages/mcp/src/gateway.test.ts b/packages/mcp/src/gateway.test.ts
 +	expect(run.isError).toBeFalsy();
 +	expect(calls).toHaveLength(1);
 +});
++
++it("lets a read-only credential find and run only read tools", async () => {
++	const server = new McpServer({ name: "gateway-test", version: "1.0.0" });
++	const readOnly: RequestAuthentication = { ...authentication, permissions: ["read"] };
++	const apiClient = {
++		resume: { listVersions: async () => [{ id: "v1" }] },
++	} as unknown as RouterClient<typeof MCP_ROUTER>;
++	registerApiGateway(
++		server,
++		(target) => {
++			registerTools(target, apiClient, new Headers(), readOnly);
++			registerParityTools(target, apiClient, new Headers(), {
++				authentication: readOnly,
++				resHeaders: new Headers(),
++				locale: "en-US",
++				trustedClient: "127.0.0.1",
++			});
++		},
++		{ expose: true, captureAll: true, mode: "search-all", canWrite: false },
++	);
++	vi.stubEnv("MCP_API_TOOLS", "search-all");
++	vi.resetModules();
++	const { registerToolDiscovery } = await import("./discovery");
++	registerToolDiscovery(server, { canWrite: false });
++	vi.unstubAllEnvs();
++	const client = new Client({ name: "gateway-client", version: "1.0.0" });
++	const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
++	await server.connect(serverTransport);
++	await client.connect(clientTransport);
++
++	const listed = (await client.listTools()).tools.map((tool) => tool.name);
++	expect(listed).toContain("api_search");
++	expect(listed).toContain("api_execute");
++	const all = await client.callTool({ name: "api_search", arguments: { query: "" } });
++	const names = (all.structuredContent as { tools: { name: string }[] }).tools.map((tool) => tool.name);
++	expect(names).toContain("list_resumes");
++	expect(names).not.toContain("delete_resume");
++	const run = await client.callTool({
++		name: "api_execute",
++		arguments: { name: "api_resume_list_versions", arguments: { resumeId: "00000000-0000-0000-0000-000000000000" } },
++	});
++	expect(run.isError).toBeFalsy();
++	const denied = await client.callTool({ name: "api_execute", arguments: { name: "delete_resume", arguments: { id: "x" } } });
++	expect(denied.isError).toBe(true);
++});
 diff -ruN a/packages/mcp/src/gateway.ts b/packages/mcp/src/gateway.ts
 --- /dev/null
 +++ b/packages/mcp/src/gateway.ts
-@@ -0,0 +1,142 @@
+@@ -0,0 +1,158 @@
 +import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 +import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 +import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
 +import z from "zod";
 +import { READ_IDEMPOTENT, WRITE_DESTRUCTIVE_EXTERNAL } from "./annotations";
-+import { PARITY_TOOL_META } from "./parity";
++import { PARITY_TOOL_META, PARITY_WRITE_TOOLS } from "./parity";
 +import { json } from "./results";
 +import { TOOL_META } from "./tool-meta";
 +
@@ -264,11 +325,19 @@ diff -ruN a/packages/mcp/src/gateway.ts b/packages/mcp/src/gateway.ts
 +}
 +
 +export const isApiTool = (name: string) => name.startsWith("api_");
++export const GATEWAY_TOOL_NAMES: ReadonlySet<string> = new Set(["api_search", "api_execute"]);
 +
-+const CATALOG: Record<string, { title: string; description: string; inputSchema: unknown }> = {
-+	...TOOL_META,
-+	...PARITY_TOOL_META,
++type CatalogEntry = {
++	title: string;
++	description: string;
++	inputSchema: unknown;
++	annotations?: { readOnlyHint?: boolean };
 +};
++const CATALOG = { ...TOOL_META, ...PARITY_TOOL_META } as Record<string, CatalogEntry>;
++
++/** Same rule as read-only discovery: read-only by annotation and by the permission its route needs. */
++const readableWithoutWrite = (name: string) =>
++	CATALOG[name]?.annotations?.readOnlyHint === true && !PARITY_WRITE_TOOLS.has(name);
 +
 +const searchTitle = "Search Reactive Resume tools";
 +const executeTitle = "Run a Reactive Resume tool";
@@ -350,7 +419,12 @@ diff -ruN a/packages/mcp/src/gateway.ts b/packages/mcp/src/gateway.ts
 +export function registerApiGateway(
 +	server: McpServer,
 +	register: (target: McpServer) => void,
-+	{ expose, captureAll = false, mode = "search" }: { expose: boolean; captureAll?: boolean; mode?: ApiToolsMode },
++	{
++		expose,
++		captureAll = false,
++		mode = "search",
++		canWrite = true,
++	}: { expose: boolean; captureAll?: boolean; mode?: ApiToolsMode; canWrite?: boolean },
 +) {
 +	const handlers = new Map<string, ToolCallback>();
 +	const capture = new Proxy(server, {
@@ -371,14 +445,17 @@ diff -ruN a/packages/mcp/src/gateway.ts b/packages/mcp/src/gateway.ts
 +	register(capture);
 +	if (!expose) return;
 +
++	// A read-only credential only finds, and only runs, what it may call.
++	const callable = [...handlers.keys()].filter((name) => canWrite || readableWithoutWrite(name));
 +	const meta = gatewayToolMeta(mode);
 +	server.registerTool("api_search", meta.api_search, ({ query, limit }) =>
-+		json({ tools: searchTools([...handlers.keys()], query, limit) }),
++		json({ tools: searchTools(callable, query, limit) }),
 +	);
 +	server.registerTool("api_execute", meta.api_execute, ({ name, arguments: args }, extra) => {
 +		const handler = handlers.get(name);
 +		const tool = CATALOG[name];
 +		if (!handler || !tool) return toolError(`Unknown tool ${name}. Find one with api_search.`);
++		if (!callable.includes(name)) return toolError(`${name} needs write access; this credential is read-only.`);
 +		const parsed = (tool.inputSchema as z.ZodType).safeParse(args ?? {});
 +		if (!parsed.success) return toolError(`Invalid arguments for ${name}:\n${z.prettifyError(parsed.error)}`);
 +		return handler(parsed.data, extra);
