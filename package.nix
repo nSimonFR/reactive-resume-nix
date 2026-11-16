@@ -105,7 +105,12 @@ stdenv.mkDerivation (finalAttrs: {
   # Dropped since v5: the error/not-found screen I18nProvider hunks (upstream now
   # wraps ErrorScreen itself) and the gallery thumbnail / home video / __root
   # icon hunks (covered by the Vite transform or moved back into index.html).
-  patches = lib.optionals (appBasePath != "/") [ ./patches/base-path-support.patch ];
+  # mcp-api-gateway: MCP_API_TOOLS=search serves the api_* MCP tools through
+  # api_search + api_execute (tools/list 690 KB -> 210 KB); "false" drops them.
+  patches = [
+    ./patches/mcp-api-gateway.patch
+  ]
+  ++ lib.optionals (appBasePath != "/") [ ./patches/base-path-support.patch ];
 
   # oRPC request batching (BatchLinkPlugin) embeds each sub-request's ABSOLUTE
   # URL — base path included — in the batch body. The proxy strips the prefix
