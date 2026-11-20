@@ -91,6 +91,15 @@ Upgrading from v5: back up the database first — the v6 migrations drop columns
 
 ## Updating Reactive Resume
 
+The MCP gateway is backported unchanged from upstream PR #3992, using its merged
+commit and a fixed `fetchpatch` hash. This replaces the locally maintained gateway
+patch without changing the v6.1.0 application or dependency pins. Set
+`MCP_API_TOOLS=search` to expose the parity API through `api_search` and
+`api_execute`, alongside the curated tools. Upstream also supports `all` (the
+default) and `none`; the former local `search-all` extension is no longer supported.
+The MCP and environment test suites run during the package build. Remove the
+backport when upgrading to a release containing the merged commit.
+
 The build pins three hashes in `package.nix` that must be bumped together on a version change:
 
 1. Set `version` to the new upstream tag.

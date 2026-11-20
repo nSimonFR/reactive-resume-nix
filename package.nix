@@ -29,6 +29,7 @@
   lib,
   stdenv,
   fetchFromGitHub,
+  fetchpatch,
   nodejs_24,
   autoPatchelfHook,
   pnpmPkgs,
@@ -105,11 +106,11 @@ stdenv.mkDerivation (finalAttrs: {
   # Dropped since v5: the error/not-found screen I18nProvider hunks (upstream now
   # wraps ErrorScreen itself) and the gallery thumbnail / home video / __root
   # icon hunks (covered by the Vite transform or moved back into index.html).
-  # mcp-api-gateway: MCP_API_TOOLS=search serves the api_* MCP tools through
-  # api_search + api_execute (tools/list 690 KB -> 210 KB); search-all serves
-  # every tool that way (2 KB); none drops api_*.
   patches = [
-    ./patches/mcp-api-gateway.patch
+    (fetchpatch {
+      url = "https://github.com/reactive-resume/reactive-resume/commit/3c38165aec88b06bd60563da354eb3dc3c167f6a.patch";
+      hash = "sha256-CtNaBUhLeVOZw0Tv8PzodouSJNLGUkcqufkQUIhbX+4=";
+    })
   ]
   ++ lib.optionals (appBasePath != "/") [ ./patches/base-path-support.patch ];
 
@@ -174,6 +175,14 @@ stdenv.mkDerivation (finalAttrs: {
     node tooling/docker/precompress.mjs apps/web/dist
 
     runHook postBuild
+  '';
+
+  doCheck = true;
+  checkPhase = ''
+    runHook preCheck
+    pnpm --filter @reactive-resume/mcp test --maxWorkers=2
+    pnpm --filter @reactive-resume/env test --maxWorkers=2
+    runHook postCheck
   '';
 
   installPhase = ''
