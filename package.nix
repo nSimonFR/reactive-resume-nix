@@ -131,6 +131,16 @@ stdenv.mkDerivation (finalAttrs: {
     substituteInPlace apps/web/src/libs/orpc/client.ts \
       --replace-fail 'groups: [{ condition: () => true, context: {} }]' \
                      'groups: [{ condition: () => false, context: {} }]'
+
+    # Social sign-in hands Better Auth an app-relative callbackURL, which it
+    # resolves against the origin: after SSO the browser landed on /dashboard
+    # (404) instead of ${appBasePath}dashboard. Same for the auth error page.
+    substituteInPlace apps/web/src/features/auth/components/social-auth.tsx \
+      --replace-fail 'callbackURL: callbackURL ?? "/dashboard",' \
+                     'callbackURL: `''${import.meta.env.BASE_URL}''${(callbackURL ?? "/dashboard").slice(1)}`,'
+    substituteInPlace packages/auth/src/config.ts \
+      --replace-fail 'onAPIError: { errorURL: "/auth/error" },' \
+                     'onAPIError: { errorURL: "${appBasePath}auth/error" },'
   '';
 
   nativeBuildInputs = [
