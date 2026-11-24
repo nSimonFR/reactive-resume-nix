@@ -149,6 +149,10 @@ stdenv.mkDerivation (finalAttrs: {
                      'basepath: "${lib.removeSuffix "/" appBasePath}", routeTree: createRootRoute(),' \
       --replace-fail 'createMemoryHistory({ initialEntries: [page.path] })' \
                      'createMemoryHistory({ initialEntries: ["${lib.removeSuffix "/" appBasePath}" + page.path] })'
+    # The homepage's language links pointed at the root ("/?locale=…").
+    substituteInPlace apps/web/src/features/homepage/sections.tsx \
+      --replace-fail 'return `/?''${url.searchParams}#languages`;' \
+                     'return `${appBasePath}?''${url.searchParams}#languages`;'
   '';
 
   nativeBuildInputs = [
