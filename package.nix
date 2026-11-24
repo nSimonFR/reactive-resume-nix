@@ -141,6 +141,14 @@ stdenv.mkDerivation (finalAttrs: {
     substituteInPlace packages/auth/src/config.ts \
       --replace-fail 'onAPIError: { errorURL: "/auth/error" },' \
                      'onAPIError: { errorURL: "${appBasePath}auth/error" },'
+
+    # The marketing pages are prerendered with their own router, which had no
+    # basepath: the served /rxresume/ page linked "Sign in" to /auth/login (404).
+    substituteInPlace apps/web/src/features/homepage/prerender.tsx \
+      --replace-fail 'routeTree: createRootRoute(),' \
+                     'basepath: "${lib.removeSuffix "/" appBasePath}", routeTree: createRootRoute(),' \
+      --replace-fail 'createMemoryHistory({ initialEntries: [page.path] })' \
+                     'createMemoryHistory({ initialEntries: ["${lib.removeSuffix "/" appBasePath}" + page.path] })'
   '';
 
   nativeBuildInputs = [
